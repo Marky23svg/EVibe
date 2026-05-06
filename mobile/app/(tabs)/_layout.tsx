@@ -12,6 +12,16 @@ function TabIcon({ name, color, focused }: { name: any; color: string; focused: 
   );
 }
 
+function HomeTabIcon({ color, focused }: { color: string; focused: boolean }) {
+  return (
+    <View style={styles.homeIconContainer}>
+      <View style={[styles.homeIconCircle, { backgroundColor: focused ? EV.primary : EV.accent }]}>
+        <Ionicons name="home" size={26} color="white" />
+      </View>
+    </View>
+  );
+}
+
 export default function TabLayout() {
   return (
     <Tabs
@@ -42,6 +52,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="home"
+        options={{
+          title: '',
+          tabBarIcon: ({ color, focused }) => (
+            <HomeTabIcon color={color} focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="budget"
         options={{
           title: 'Budget',
@@ -51,21 +70,24 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="carbon"
+        name="eco"
         options={{
-          title: 'Carbon',
+          title: 'Eco',
           tabBarIcon: ({ color, focused }) => (
             <TabIcon name="leaf" color={color} focused={focused} />
           ),
         }}
       />
       <Tabs.Screen
+        name="carbon"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="score"
         options={{
-          title: 'Eco Score',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="star" color={color} focused={focused} />
-          ),
+          href: null,
         }}
       />
     </Tabs>
@@ -95,5 +117,22 @@ const styles = StyleSheet.create({
   },
   iconWrapActive: {
     backgroundColor: EV.borderGlow,
+  },
+  homeIconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -15,
+  },
+  homeIconCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: EV.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });

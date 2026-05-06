@@ -56,9 +56,9 @@ export const STATIONS: Station[] = [
   { id: 'lrt2-8', name: 'Araneta Cubao', line: 'LRT-2', order: 8, coordinate: { latitude: 14.6154, longitude: 121.0489 }, fare_base: 12 },
   { id: 'lrt2-9', name: 'Anonas', line: 'LRT-2', order: 9, coordinate: { latitude: 14.6198, longitude: 121.0534 }, fare_base: 12 },
   { id: 'lrt2-10', name: 'Katipunan', line: 'LRT-2', order: 10, coordinate: { latitude: 14.6276, longitude: 121.0712 }, fare_base: 12 },
-  { id: 'lrt2-11', name: 'Santolan', line: 'LRT-2', order: 11, coordinate: { latitude: 14.6354, longitude: 121.0823 }, fare_base: 12 },
-  { id: 'lrt2-12', name: 'Marikina-Pasig', line: 'LRT-2', order: 12, coordinate: { latitude: 14.6298, longitude: 121.0934 }, fare_base: 12 },
-  { id: 'lrt2-13', name: 'Antipolo', line: 'LRT-2', order: 13, coordinate: { latitude: 14.6243, longitude: 121.1045 }, fare_base: 12 },
+  { id: 'lrt2-11', name: 'Santolan LRT', line: 'LRT-2', order: 11, coordinate: { latitude: 14.6223, longitude: 121.0860 }, fare_base: 12 },
+  { id: 'lrt2-12', name: 'Marikina-Pasig LRT', line: 'LRT-2', order: 12, coordinate: { latitude: 14.6219, longitude: 121.0948 }, fare_base: 12 },
+  { id: 'lrt2-13', name: 'Antipolo LRT', line: 'LRT-2', order: 13, coordinate: { latitude: 14.6152, longitude: 121.1221 }, fare_base: 12 },
 ];
 
 const getDistance = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => {
@@ -99,3 +99,19 @@ export const LINE_COLORS: Record<string, string> = {
   'LRT-1': '#00C853',
   'LRT-2': '#6C63FF',
 };
+
+// Transfer links between stations at the same interchange
+export const TRANSFER_LINKS: { from: string; to: string; walkMin: number }[] = [
+  // Araneta Cubao: MRT-3 <-> LRT-2 (walkable)
+  { from: 'mrt-4', to: 'lrt2-8', walkMin: 5 },
+  { from: 'lrt2-8', to: 'mrt-4', walkMin: 5 },
+  // EDSA (Taft): MRT-3 ↔ LRT-1
+  { from: 'mrt-13', to: 'lrt1-19', walkMin: 3 },
+  { from: 'lrt1-19', to: 'mrt-13', walkMin: 3 },
+  // Doroteo Jose: LRT-1 ↔ LRT-2 (Recto)
+  { from: 'lrt1-10', to: 'lrt2-1', walkMin: 5 },
+  { from: 'lrt2-1', to: 'lrt1-10', walkMin: 5 },
+];
+
+export const getTransferLink = (fromId: string, toId: string) =>
+  TRANSFER_LINKS.find(t => t.from === fromId && t.to === toId) ?? null;

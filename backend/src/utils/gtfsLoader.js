@@ -12,6 +12,8 @@ const stopsByRoute = new Map();
 const routesByStop = new Map();
 const tripsByRoute = new Map();
 const stopTimesByTrip = new Map();
+const shapesByTrip = new Map();
+const shapeCoordsByRoute = new Map();
 
 const loadCSV = (filename) => {
   const content = fs.readFileSync(path.join(GTFS_DIR, filename), 'utf8');
@@ -48,7 +50,18 @@ const load = () => {
   // Load trips
   loadCSV('trips.txt').forEach(t => {
     if (!tripsByRoute.has(t.route_id)) tripsByRoute.set(t.route_id, []);
-    tripsByRoute.get(t.route_id).push(t.trip_id);
+    tripsByRoute.get(t.route_id).push({ tripId: t.trip_id, shapeId: t.shape_id });
+  });
+
+  // Load shapes
+  const rawShapes = new Map();
+  loadCSV('shapes.txt').forEach(s => {
+    if (!rawShapes.has(s.shape_id)) rawShapes.set(s.shape_id, []);
+    rawShapes.get(s.shape_id).push({ lat: parseFloat(s.shape_pt_lat), lon: parseFloat(s.shape_pt_lon), seq: parseInt(s.shape_pt_sequence) });
+  });
+  rawShapes.forEach((pts, shapeId) => {
+    pts.sort((a, b) => a.seq - b.seq);
+    shapesByTrip.set(shapeId, pts.map(p => ({ lat: p.lat, lon: p.lon })));
   });
 
   // Load stop_times and build indexes
@@ -64,14 +77,19 @@ const load = () => {
     stops.sort((a, b) => a.seq - b.seq);
   });
 
-  // Build stopsByRoute and routesByStop
+  // Build stopsByRoute, routesByStop and shapeCoordsByRoute
   routesById.forEach((route, routeId) => {
     const trips = tripsByRoute.get(routeId) || [];
     if (trips.length === 0) return;
 
-    // Use first trip to get stop order
     const firstTrip = trips[0];
-    const tripStops = tripStopMap.get(firstTrip) || [];
+
+    // Store shape coords for this route
+    if (firstTrip.shapeId && shapesByTrip.has(firstTrip.shapeId)) {
+      shapeCoordsByRoute.set(routeId, shapesByTrip.get(firstTrip.shapeId));
+    }
+
+    const tripStops = tripStopMap.get(firstTrip.tripId) || [];
     const stops = tripStops.map(ts => stopsById.get(ts.stopId)).filter(Boolean);
 
     stopsByRoute.set(routeId, stops);
@@ -95,4 +113,5 @@ module.exports = {
   routesByStop,
   tripsByRoute,
   stopTimesByTrip,
+  shapeCoordsByRoute,
 };

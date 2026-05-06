@@ -17,7 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { height } = Dimensions.get('window');
 const PEEK = 72;
-const FULL = 304;
+const FULL = 420;
 
 const MODES = [
   { key: 'walking', icon: 'walk', label: 'Walk', profile: 'foot-walking' },
@@ -42,6 +42,8 @@ export default function MapScreen() {
   const [routeLoading, setRouteLoading] = useState(false);
   const [originSuggestions, setOriginSuggestions] = useState<any[]>([]);
   const [destSuggestions, setDestSuggestions] = useState<any[]>([]);
+  const [nearbyOriginStations, setNearbyOriginStations] = useState<any[]>([]);
+  const [stationsLoading, setStationsLoading] = useState(false);
   const [activeField, setActiveField] = useState<'origin' | 'dest' | null>(null);
   const [commuteSteps, setCommuteSteps] = useState<any[]>([]);
   const [commuteSuggestions, setCommuteSuggestions] = useState<any[]>([]);
@@ -159,11 +161,25 @@ export default function MapScreen() {
     }, 600);
   };
 
+  const loadNearbyStations = async (coords: { latitude: number; longitude: number }) => {
+    setStationsLoading(true);
+    try {
+      const data = await fetchStations(coords.latitude, coords.longitude, 5);
+      setNearbyOriginStations(data);
+      setSTATIONS(data);
+    } catch {
+      setNearbyOriginStations([]);
+    } finally {
+      setStationsLoading(false);
+    }
+  };
+
   const useCurrentLocation = async () => {
     if (!userLocation) return;
     setOrigin('📍 My Location');
     setOriginCoords(userLocation);
     setOriginSuggestions([]);
+    loadNearbyStations(userLocation);
   };
 
   const handleCalculateRoute = async () => {
@@ -177,14 +193,16 @@ export default function MapScreen() {
     try {
       if (mode === 'commute') {
         const result = await getCommuteRoute(from, to);
+        setSelectedSuggestion(0);
         setCommuteSuggestions(result.suggestions);
         setRouteInfo({ distanceKm: result.totalDistanceKm.toString(), durationMin: result.suggestions[0]?.totalDuration || 0 });
         setRouteActive(true);
-        // Draw first suggestion coords on map
-        const firstCoords = result.suggestions[0]?.steps.flatMap((s: any) => s.coordinates || []) || [];
-        if (firstCoords.length > 1) {
-          setRouteCoords(firstCoords);
-          mapRef.current?.fitToCoordinates(firstCoords, {
+        snapTo(FULL);
+        // Draw first suggestion coords on map — fit bounds only
+        const firstSteps = result.suggestions[0]?.steps || [];
+        const allCoords = firstSteps.flatMap((s: any) => s.coordinates || []);
+        if (allCoords.length > 1) {
+          mapRef.current?.fitToCoordinates(allCoords, {
             edgePadding: { top: 260, right: 40, bottom: FULL + 20, left: 40 },
             animated: true,
           });
@@ -298,7 +316,15 @@ export default function MapScreen() {
         showsMyLocationButton={false}
         showsCompass={false}>
         {stationMarkers}
-        {routeCoords.length > 1 && (
+        {/* Draw route polylines - separate line for each step with geometry */}
+        {mode === 'commute' && commuteSuggestions.length > 0 && commuteSuggestions[selectedSuggestion]?.steps.map((step: any, idx: number) => {
+          const coords = step.coordinates || [];
+          return coords.length > 1 ? (
+            <Polyline key={`step-${idx}`} coordinates={coords} strokeColor={step.color} strokeWidth={4} />
+          ) : null;
+        })}
+        {/* Single polyline for non-commute modes */}
+        {mode !== 'commute' && routeCoords.length > 1 && (
           <Polyline coordinates={routeCoords} strokeColor={EV.primary} strokeWidth={4} />
         )}
       </MapView>
@@ -326,7 +352,13 @@ export default function MapScreen() {
             <View style={styles.suggestionsBox}>
               {originSuggestions.map((s, i) => (
                 <TouchableOpacity key={i} style={[styles.suggestionItem, i < originSuggestions.length - 1 && styles.suggestionBorder]}
-                  onPress={() => { setOrigin(s.label); setOriginCoords({ latitude: s.latitude, longitude: s.longitude }); setOriginSuggestions([]); }}>
+                  onPress={() => {
+                    const coords = { latitude: s.latitude, longitude: s.longitude };
+                    setOrigin(s.label);
+                    setOriginCoords(coords);
+                    setOriginSuggestions([]);
+                    loadNearbyStations(coords);
+                  }}>
                   <Ionicons name="location-outline" size={13} color={EV.primary} />
                   <Text style={styles.suggestionText} numberOfLines={1}>{s.label}</Text>
                 </TouchableOpacity>
@@ -348,7 +380,7 @@ export default function MapScreen() {
               onFocus={() => setActiveField('dest')}
             />
             {(origin || destination) && (
-              <TouchableOpacity onPress={() => { setOrigin(''); setDestination(''); setOriginCoords(null); setDestCoords(null); setRouteActive(false); setRouteCoords([]); setRouteInfo(null); }}>
+              <TouchableOpacity onPress={() => { setOrigin(''); setDestination(''); setOriginCoords(null); setDestCoords(null); setRouteActive(false); setRouteCoords([]); setRouteInfo(null); setNearbyOriginStations([]); }}>
                 <Ionicons name="close-circle" size={16} color={EV.textDim} />
               </TouchableOpacity>
             )}
@@ -369,7 +401,13 @@ export default function MapScreen() {
           {/* Mode selector */}
           <View style={styles.modeRow}>
             {MODES.map(m => (
-              <TouchableOpacity key={m.key} style={[styles.modeBtn, mode === m.key && styles.modeBtnActive]} onPress={() => setMode(m.key)}>
+              <TouchableOpacity key={m.key} style={[styles.modeBtn, mode === m.key && styles.modeBtnActive]} onPress={() => {
+                setMode(m.key);
+                setCommuteSuggestions([]);
+                setRouteCoords([]);
+                setRouteInfo(null);
+                setRouteActive(false);
+              }}>
                 <Ionicons name={m.icon as any} size={16} color={mode === m.key ? EV.bg : EV.textMuted} />
                 <Text style={[styles.modeLabel, mode === m.key && styles.modeLabelActive]}>{m.label}</Text>
               </TouchableOpacity>
@@ -489,71 +527,82 @@ export default function MapScreen() {
           </View>
         ) : commuteSuggestions.length > 0 ? (
           <ScrollView style={styles.sheetContent} showsVerticalScrollIndicator={false}>
-            {commuteSuggestions.map((suggestion: any, si: number) => (
-              <TouchableOpacity
-                key={si}
-                style={[styles.journeyCard, selectedSuggestion === si && { borderColor: suggestion.color }]}
-                onPress={() => {
-                  setSelectedSuggestion(si);
-                  const coords = suggestion.steps.flatMap((s: any) => s.coordinates || []);
-                  if (coords.length > 1) {
-                    setRouteCoords(coords);
-                    mapRef.current?.fitToCoordinates(coords, {
-                      edgePadding: { top: 260, right: 40, bottom: FULL + 20, left: 40 },
-                      animated: true,
-                    });
-                  }
-                }}
-                activeOpacity={0.85}>
-                <View style={styles.journeyHeader}>
-                  <View style={styles.journeyHeaderLeft}>
-                    <View style={[styles.journeyBadge, { backgroundColor: suggestion.color }]}>
-                      <Text style={styles.journeyBadgeText}>{suggestion.line}</Text>
-                    </View>
-                    <View>
-                      <Text style={styles.journeyDuration}>{suggestion.totalDuration} min</Text>
-                      <Text style={styles.journeyFare}>₱{suggestion.totalFare} estimated</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionTabs}>
+              {commuteSuggestions.map((s: any, i: number) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[styles.suggestionTab, selectedSuggestion === i && { backgroundColor: s.color, borderColor: s.color }]}
+                  onPress={() => {
+                    setSelectedSuggestion(i);
+                    const coords = s.steps.flatMap((st: any) => st.coordinates || []);
+                    if (coords.length > 1) {
+                      mapRef.current?.fitToCoordinates(coords, {
+                        edgePadding: { top: 260, right: 40, bottom: FULL + 20, left: 40 },
+                        animated: true,
+                      });
+                    }
+                  }}>
+                  <Text style={[styles.suggestionTabText, selectedSuggestion === i && { color: EV.bg }]}>{i + 1}</Text>
+                  <Text style={[styles.suggestionTabDur, selectedSuggestion === i && { color: EV.bg }]}>{s.totalDuration}m</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {commuteSuggestions[selectedSuggestion] && (() => {
+              const suggestion = commuteSuggestions[selectedSuggestion];
+              return (
+                <View style={[styles.journeyCard, { borderColor: suggestion.color }]}>
+                  <View style={styles.journeyHeader}>
+                    <View style={styles.journeyHeaderLeft}>
+                      <View style={[styles.journeyBadge, { backgroundColor: suggestion.color }]}>
+                        <Text style={styles.journeyBadgeText}>{suggestion.line}</Text>
+                      </View>
+                      <View>
+                        <Text style={styles.journeyDuration}>{suggestion.totalDuration} min</Text>
+                        <Text style={styles.journeyFare}>₱{suggestion.totalFare} estimated</Text>
+                      </View>
                     </View>
                   </View>
-                  {selectedSuggestion === si && (
-                    <View style={[styles.selectedBadge, { backgroundColor: suggestion.color + '20', borderColor: suggestion.color }]}>
-                      <Text style={[styles.selectedBadgeText, { color: suggestion.color }]}>Selected</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.timeline}>
-                  {suggestion.steps.map((step: any, i: number) => (
-                    <View key={i} style={styles.timelineRow}>
-                      <View style={styles.timelineLeft}>
-                        <View style={[styles.timelineIcon, { backgroundColor: step.color + '20', borderColor: step.color }]}>
-                          <Ionicons name={step.type === 'walk' ? 'walk' : step.type === 'train' ? 'train' : 'bus'} size={14} color={step.color} />
-                        </View>
-                        {i < suggestion.steps.length - 1 && (
-                          <View style={[styles.timelineLine, { backgroundColor: step.color + '40' }]} />
-                        )}
-                      </View>
-                      <View style={styles.timelineContent}>
-                        <Text style={styles.timelineLabel}>{step.label}</Text>
-                        <Text style={styles.timelineDetail}>{step.detail}</Text>
-                        {step.duration > 0 && (
-                          <View style={styles.timelineDurationRow}>
-                            <Ionicons name="time-outline" size={10} color={EV.textDim} />
-                            <Text style={styles.timelineDuration}>{step.duration} min</Text>
-                            {step.fare > 0 && <Text style={styles.timelineFare}>₱{step.fare}</Text>}
+                  <View style={styles.timeline}>
+                    {suggestion.steps.map((step: any, i: number) => (
+                      <View key={i} style={styles.timelineRow}>
+                        <View style={styles.timelineLeft}>
+                          <View style={[styles.timelineIcon, { backgroundColor: step.color + '20', borderColor: step.color }]}>
+                            <Ionicons name={step.type === 'walk' ? 'walk' : step.type === 'train' ? 'train' : step.type === 'jeep' ? 'car' : 'bus'} size={14} color={step.color} />
                           </View>
-                        )}
+                          {i < suggestion.steps.length - 1 && (
+                            <View style={[styles.timelineLine, { backgroundColor: step.color + '40' }]} />
+                          )}
+                        </View>
+                        <View style={styles.timelineContent}>
+                          <Text style={styles.timelineLabel}>{step.label}</Text>
+                          <Text style={styles.timelineDetail}>{step.detail}</Text>
+                          {step.duration > 0 && (
+                            <View style={styles.timelineDurationRow}>
+                              <Ionicons name="time-outline" size={10} color={EV.textDim} />
+                              <Text style={styles.timelineDuration}>{step.duration} min</Text>
+                              {step.fare > 0 && <Text style={styles.timelineFare}>₱{step.fare}</Text>}
+                            </View>
+                          )}
+                        </View>
                       </View>
-                    </View>
-                  ))}
+                    ))}
+                  </View>
                 </View>
-              </TouchableOpacity>
-            ))}
+              );
+            })()}
             <View style={{ height: 16 }} />
           </ScrollView>
         ) : (
           <View style={styles.sheetContent}>
+            {nearbyOriginStations.length > 0 && (
+              <View style={styles.nearbyHeader}>
+                <Ionicons name="flash" size={13} color={EV.primary} />
+                <Text style={styles.nearbyTitle}>NEAR STARTING POINT</Text>
+                {stationsLoading && <ActivityIndicator size="small" color={EV.primary} style={{ marginLeft: 6 }} />}
+              </View>
+            )}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stationList}>
-              {STATIONS.map((s, index) => (
+              {(nearbyOriginStations.length > 0 ? nearbyOriginStations : STATIONS).map((s, index) => (
                 <TouchableOpacity key={`sheet-${s.id}-${index}`} style={styles.stationCard} onPress={() => handleStationPress(s.id)} activeOpacity={0.85}>
                   <View style={styles.stationCardTop}>
                     <View style={[styles.stationCardIcon, s.type === 'DC Fast' && styles.stationCardIconFast]}>
@@ -572,8 +621,7 @@ export default function MapScreen() {
                     <View style={styles.stationStat}><Text style={styles.stationStatVal}>{s.power}</Text><Text style={styles.stationStatLbl}>Power</Text></View>
                   </View>
                   <TouchableOpacity style={styles.cardNavBtn} onPress={() => handleStationPress(s.id)}>
-                    <Ionicons name="navigate" size={13} color={EV.bg} />
-                    <Text style={styles.cardNavBtnText}>Go Here</Text>
+                    <Ionicons name="navigate" size={14} color={EV.bg} />
                   </TouchableOpacity>
                 </TouchableOpacity>
               ))}
@@ -685,29 +733,32 @@ const styles = StyleSheet.create({
   sheetBadge: { backgroundColor: EV.primary, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
   sheetBadgeText: { fontSize: 11, fontWeight: '800', color: EV.bg },
 
-  sheetContent: { paddingLeft: 16, paddingBottom: 16 },
+  sheetContent: { paddingHorizontal: 16, paddingBottom: 16 },
+  nearbyHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  nearbyTitle: { fontSize: 11, fontWeight: '700', color: EV.primary, letterSpacing: 1.2 },
   stationList: { gap: 10, paddingRight: 16 },
   stationCard: {
-    width: 160, height: 200,
-    backgroundColor: EV.bgSurface, borderRadius: 18,
-    padding: 14, borderWidth: 1, borderColor: EV.border,
+    width: 150, height: 180,
+    backgroundColor: EV.bgSurface, borderRadius: 16,
+    padding: 12, borderWidth: 1, borderColor: EV.border,
   },
-  stationCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  stationCardIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: EV.primaryDeep, alignItems: 'center', justifyContent: 'center' },
+  stationCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  stationCardIcon: { width: 28, height: 28, borderRadius: 8, backgroundColor: EV.primaryDeep, alignItems: 'center', justifyContent: 'center' },
   stationCardIconFast: { backgroundColor: EV.primary },
-  availPill: { backgroundColor: EV.bgCard, borderRadius: 7, paddingHorizontal: 6, paddingVertical: 3, borderWidth: 1, borderColor: EV.primaryDark },
+  availPill: { backgroundColor: EV.bgCard, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2, borderWidth: 1, borderColor: EV.primaryDark },
   availPillEmpty: { borderColor: EV.danger },
-  availPillText: { fontSize: 10, color: EV.primary, fontWeight: '700' },
-  stationCardName: { fontSize: 13, fontWeight: '700', color: EV.text, marginBottom: 2 },
-  stationCardType: { fontSize: 11, color: EV.textMuted, marginBottom: 10 },
-  stationCardDivider: { height: 1, backgroundColor: EV.border, marginBottom: 10 },
-  stationCardStats: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  availPillText: { fontSize: 9, color: EV.primary, fontWeight: '700' },
+  stationCardName: { fontSize: 12, fontWeight: '700', color: EV.text, marginBottom: 1 },
+  stationCardType: { fontSize: 10, color: EV.textMuted, marginBottom: 8 },
+  stationCardDivider: { height: 1, backgroundColor: EV.border, marginBottom: 8 },
+  stationCardStats: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   stationStat: { alignItems: 'center' },
-  stationStatVal: { fontSize: 11, fontWeight: '700', color: EV.text },
-  stationStatLbl: { fontSize: 9, color: EV.textMuted, marginTop: 2 },
+  stationStatVal: { fontSize: 10, fontWeight: '700', color: EV.text },
+  stationStatLbl: { fontSize: 9, color: EV.textMuted, marginTop: 1 },
   cardNavBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
-    backgroundColor: EV.primary, borderRadius: 10, paddingVertical: 8,
+    alignSelf: 'flex-end',
+    width: 30, height: 30, borderRadius: 8,
+    backgroundColor: EV.primary, alignItems: 'center', justifyContent: 'center',
   },
   cardNavBtnText: { fontSize: 12, fontWeight: '700', color: EV.bg },
 
@@ -765,9 +816,18 @@ const styles = StyleSheet.create({
   suggestionDuration: { color: EV.text, fontSize: 11, fontWeight: '700', flex: 1 },
   suggestionFare: { color: EV.primary, fontSize: 11, fontWeight: '800' },
 
+  suggestionTabs: { flexDirection: 'row', gap: 8, paddingBottom: 10 },
+  suggestionTab: {
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 12, borderWidth: 1, borderColor: EV.border,
+    backgroundColor: EV.bgSurface, minWidth: 52,
+  },
+  suggestionTabText: { fontSize: 13, fontWeight: '800', color: EV.text },
+  suggestionTabDur: { fontSize: 10, color: EV.textMuted, marginTop: 2 },
   journeyCard: {
     backgroundColor: EV.bgSurface, borderRadius: 16, borderWidth: 1,
-    borderColor: EV.border, marginBottom: 12, overflow: 'hidden',
+    borderColor: EV.border, marginBottom: 12, overflow: 'hidden', marginHorizontal: 0,
   },
   journeyHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

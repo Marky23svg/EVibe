@@ -30,6 +30,7 @@
 "LTFRB_4985",,"Anonas LRT",,14.628,121.065,,,0,,0
 "LTFRB_4986",,"Katipunan LRT",,14.631,121.073,,,0,,0
 "LTFRB_4987",,"Santolan LRT",,14.6223,121.086,,,0,,0
+"LTFRB_4988",,"Marikina-Pasig LRT",,14.6219,121.0948,,,0,,0
 "LTFRB_1",,"Ang Dating Daan, Balagtas",,14.8237,120.9,,,0,,0
 "LTFRB_10",,"Vista Lodge, MacArthur Highway, Balagtas",,14.8131,120.913,,,0,,0
 "LTFRB_100",,"Floresco North Mortuary, MacArthur Highway, Caloocan City",,14.6601,120.984,,,0,,0

@@ -78,7 +78,7 @@ export default function StationsScreen() {
       </View>
 
       {/* Filter chips */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterRow}>
         {FILTERS.map(f => (
           <TouchableOpacity
             key={f}
@@ -206,11 +206,11 @@ export default function StationsScreen() {
 
                   <View style={styles.actionRow}>
                     <TouchableOpacity style={styles.dirBtn}>
-                      <Ionicons name="navigate-outline" size={15} color={EV.primary} />
+                      <Ionicons name="navigate-outline" size={14} color={EV.primary} />
                       <Text style={styles.dirBtnText}>Directions</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.addTripBtn}>
-                      <Ionicons name="add-circle" size={15} color={EV.bg} />
+                      <Ionicons name="add-circle" size={14} color={EV.bg} />
                       <Text style={styles.addTripBtnText}>Add to Trip</Text>
                     </TouchableOpacity>
                   </View>
@@ -261,17 +261,19 @@ const styles = StyleSheet.create({
   },
   headerBadgeText: { fontSize: 13, fontWeight: '800', color: EV.bg },
 
-  filterRow: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
+  filterScroll: { maxHeight: 44 },
+  filterRow: { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: 'center' },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
     backgroundColor: EV.bgCard,
     borderWidth: 1,
     borderColor: EV.border,
+    height: 32,
   },
   chipActive: { backgroundColor: EV.primary, borderColor: EV.primary },
   chipText: { fontSize: 13, color: EV.textMuted, fontWeight: '600' },
@@ -372,30 +374,30 @@ const styles = StyleSheet.create({
     borderColor: EV.info + '40',
   },
   connectorChipText: { fontSize: 11, color: EV.info, fontWeight: '600' },
-  actionRow: { flexDirection: 'row', gap: 10 },
+  actionRow: { flexDirection: 'row', gap: 8 },
   dirBtn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 12,
+    gap: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: EV.primary,
   },
-  dirBtnText: { fontSize: 13, fontWeight: '700', color: EV.primary },
+  dirBtnText: { fontSize: 12, fontWeight: '700', color: EV.primary },
   addTripBtn: {
-    flex: 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 12,
+    gap: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
     backgroundColor: EV.primary,
   },
-  addTripBtnText: { fontSize: 13, fontWeight: '700', color: EV.bg },
+  addTripBtnText: { fontSize: 12, fontWeight: '700', color: EV.bg },
 
   expandIndicator: { alignItems: 'center', marginTop: 10 },
 });

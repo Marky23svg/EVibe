@@ -137,7 +137,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.headerGreeting}>{getGreeting()},</Text>
-          <Text style={styles.headerName}>{userName}</Text>
+          <Text style={styles.headerName}>{userName} 👋</Text>     
         </View>
         <TouchableOpacity onPress={handleProfilePress} style={styles.profileBtn}>
           <Text style={styles.profileText}>{userName.charAt(0).toUpperCase()}</Text>
@@ -309,8 +309,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: EV.border,
   },
-  headerGreeting: { fontSize: 18, fontWeight: '400', color: EV.textMuted },
-  headerName: { fontSize: 20, fontWeight: '800', color: EV.text, marginTop: 2 },
+  headerGreeting: { fontSize: 15, fontWeight: '400', color: EV.textMuted, marginTop: -8 },
+  headerName: { fontSize: 25, fontWeight: '800', color: EV.text, marginTop: 1 },
   profileBtn: { 
     width: 40, 
     height: 40, 
@@ -410,4 +410,5 @@ const styles = StyleSheet.create({
   historyDist: { fontSize: 12, color: EV.textMuted },
   historyStars: { flexDirection: 'row', gap: 2, marginTop: 2 },
   deleteBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: EV.danger + '18', alignItems: 'center', justifyContent: 'center' },
+
 });

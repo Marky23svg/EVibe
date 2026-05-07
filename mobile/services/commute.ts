@@ -112,10 +112,18 @@ const getDistanceKm = (a: { latitude: number; longitude: number }, b: { latitude
 
 const getWalkMin = (distKm: number) => Math.max(1, Math.round(distKm * 15)); // 15 mins per km
 
+let commuteCache: { [key: string]: { data: CommuteResult, timestamp: number } } = {};
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 export const getCommuteRoute = async (
   from: { latitude: number; longitude: number },
   to: { latitude: number; longitude: number }
 ): Promise<CommuteResult> => {
+  const cacheKey = `${from.latitude.toFixed(4)},${from.longitude.toFixed(4)}-${to.latitude.toFixed(4)},${to.longitude.toFixed(4)}`;
+  const now = Date.now();
+  if (commuteCache[cacheKey] && (now - commuteCache[cacheKey].timestamp < CACHE_TTL)) {
+    return commuteCache[cacheKey].data;
+  }
   try {
     const startStation = findNearestStation(from);
     const endStation = findNearestStation(to);
@@ -224,14 +232,17 @@ export const getCommuteRoute = async (
         }];
       };
 
-      const firstSteps = await createFlexSteps(from, startStation.coordinate, startStation.name, true);
+      const [firstSteps, lastSteps] = await Promise.all([
+        createFlexSteps(from, startStation.coordinate, startStation.name, true),
+        createFlexSteps(endStation.coordinate, to, '', false)
+      ]);
       steps.push(...firstSteps);
 
       let currentLine: string | null = null;
       let segmentStart: Station | null = null;
-      let totalFare = firstSteps.reduce((s, st) => s + st.fare, 0);
-      let totalDuration = firstSteps.reduce((s, st) => s + st.duration, 0);
-      let totalDist = getDistanceKm(from, startStation.coordinate);
+      let totalFare = firstSteps.reduce((s, st) => s + st.fare, 0) + lastSteps.reduce((s, st) => s + st.fare, 0);
+      let totalDuration = firstSteps.reduce((s, st) => s + st.duration, 0) + lastSteps.reduce((s, st) => s + st.duration, 0);
+      let totalDist = getDistanceKm(from, startStation.coordinate) + getDistanceKm(endStation.coordinate, to);
 
       for (let i = 0; i < pathStations.length; i++) {
         const s = pathStations[i];
@@ -259,6 +270,7 @@ export const getCommuteRoute = async (
           if (segmentCount > 1 || (segmentCount === 1 && segDist > 0.5)) {
             totalFare += fare;
             totalDuration += dur;
+            totalDist += segDist;
             
             // Build high-fidelity polyline for segment from RAIL_SHAPES
             let segmentCoords: {latitude: number, longitude: number}[] = [];
@@ -339,12 +351,8 @@ export const getCommuteRoute = async (
         }
       }
 
-      const lastSteps = await createFlexSteps(endStation.coordinate, to, '', false);
       steps.push(...lastSteps);
       
-      totalDuration += lastSteps.reduce((s, st) => s + st.duration, 0);
-      totalFare += lastSteps.reduce((s, st) => s + st.fare, 0);
-      totalDist += getDistanceKm(endStation.coordinate, to);
 
       const firstStation = pathStations[0];
       return {
@@ -362,23 +370,26 @@ export const getCommuteRoute = async (
     const fastPathIds = findShortestPath(startStation.id, endStation.id, 'duration');
     const cheapPathIds = findShortestPath(startStation.id, endStation.id, 'fare');
 
-    const suggestions: CommuteSuggestion[] = [];
-    const fastSuggestion = await buildSuggestion(fastPathIds, 'Fastest');
-    if (fastSuggestion) suggestions.push(fastSuggestion);
+    const [fastSuggestion, cheapSuggestion] = await Promise.all([
+      buildSuggestion(fastPathIds, 'Fastest'),
+      JSON.stringify(cheapPathIds) !== JSON.stringify(fastPathIds)
+        ? buildSuggestion(cheapPathIds, 'Cheapest')
+        : Promise.resolve(null)
+    ]);
 
-    // Only add cheap suggestion if it's different or significantly cheaper
-    if (JSON.stringify(cheapPathIds) !== JSON.stringify(fastPathIds)) {
-      const cheapSuggestion = await buildSuggestion(cheapPathIds, 'Cheapest');
-      if (cheapSuggestion) suggestions.push(cheapSuggestion);
-    }
+    const suggestions: CommuteSuggestion[] = [];
+    if (fastSuggestion) suggestions.push(fastSuggestion);
+    if (cheapSuggestion) suggestions.push(cheapSuggestion);
 
     if (suggestions.length === 0) return getRoadFallback(from, to);
 
-    return {
+    const finalResult: CommuteResult = {
       type: 'train',
       suggestions,
       totalDistanceKm: suggestions[0].totalDistanceKm || 0
     };
+    commuteCache[cacheKey] = { data: finalResult, timestamp: now };
+    return finalResult;
 
   } catch (err) {
     console.error('Commute routing error:', err);
@@ -395,7 +406,7 @@ const getRoadFallback = async (
     const dist = parseFloat(road.distanceKm);
     // Real-world fallback: ₱15 base (Bus/Modern Jeep) + ₱2.20 per km
     const fare = Math.round(15 + dist * 2.20);
-    return {
+    const result: CommuteResult = {
       type: 'road',
       suggestions: [{
         type: 'bus',
@@ -416,6 +427,7 @@ const getRoadFallback = async (
       }],
       totalDistanceKm: dist,
     };
+    return result;
   } catch {
     return { type: 'road', suggestions: [], totalDistanceKm: 0 };
   }

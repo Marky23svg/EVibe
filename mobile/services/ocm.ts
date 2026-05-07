@@ -3,7 +3,18 @@ import axios from 'axios';
 const OCM_KEY = process.env.EXPO_PUBLIC_OCM_KEY!;
 const BASE = 'https://api.openchargemap.io/v3/poi';
 
+let stationCache: { [key: string]: { data: any, timestamp: number } } = {};
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 export const fetchStations = async (latitude: number, longitude: number, distance = 10) => {
+  // Use 2 decimal places for cache key (~1km precision)
+  const cacheKey = `${latitude.toFixed(2)}-${longitude.toFixed(2)}-${distance}`;
+  const now = Date.now();
+
+  if (stationCache[cacheKey] && (now - stationCache[cacheKey].timestamp < CACHE_DURATION)) {
+    return stationCache[cacheKey].data;
+  }
+
   const res = await axios.get(BASE, {
     params: {
       key: OCM_KEY,
@@ -11,14 +22,14 @@ export const fetchStations = async (latitude: number, longitude: number, distanc
       longitude,
       distance,
       distanceunit: 'km',
-      maxresults: 10,
+      maxresults: 15,
       compact: true,
       verbose: false,
       output: 'json',
     },
   });
 
-  return res.data.map((s: any) => ({
+  const mapped = res.data.map((s: any) => ({
     id: String(s.ID),
     name: s.AddressInfo?.Title || 'Unknown Station',
     address: s.AddressInfo?.AddressLine1 || '',
@@ -35,4 +46,7 @@ export const fetchStations = async (latitude: number, longitude: number, distanc
       longitude: s.AddressInfo?.Longitude,
     },
   }));
+
+  stationCache[cacheKey] = { data: mapped, timestamp: now };
+  return mapped;
 };

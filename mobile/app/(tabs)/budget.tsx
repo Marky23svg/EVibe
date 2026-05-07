@@ -607,7 +607,7 @@ export default function BudgetScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: EV.bg },
   header: { paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: EV.border },
-  headerLogo: { width: 40, height: 40, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
+  headerLogo: { width: 40, height: 40, borderRadius: 10, shadowColor: '#a1a1a1', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
   headerTitle: { fontSize: 20, fontWeight: '800', color: EV.text },
   tabs: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: EV.border },
   tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10, backgroundColor: EV.bgCard },
@@ -678,7 +678,7 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: 'row', gap: 16 },
   summaryItem: { flex: 1, alignItems: 'center' },
   summaryLabel: { fontSize: 11, color: EV.textMuted, fontWeight: '600', marginBottom: 6 },
-  summaryValue: { fontSize: 20, fontWeight: '900', marginBottom: 4 },
+  summaryValue: { fontSize: 17, fontWeight: '900', marginBottom: 4 },
   summaryChange: { fontSize: 11, fontWeight: '700' },
   trendRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   trendMonth: { width: 40, fontSize: 12, fontWeight: '700', color: EV.textMuted },

@@ -16,6 +16,9 @@ app.use('/api/expenses', require('./src/routes/expenses'));
 app.use('/api/incomes', require('./src/routes/incomes'));
 app.use('/api/gtfs', require('./src/routes/gtfs'));
 
+// Pre-load GTFS data for better performance on first request
+require('./src/utils/gtfsLoader').load();
+
 app.get('/', (req, res) => res.json({ message: 'GoGreen API running' }));
 
 const PORT = process.env.PORT || 5000;

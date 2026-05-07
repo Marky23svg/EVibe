@@ -29,7 +29,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarStyle: styles.tabBar,
         tabBarActiveTintColor: EV.primary,
-        tabBarInactiveTintColor: EV.textDim,
+        tabBarInactiveTintColor: EV.accent,
         tabBarLabelStyle: styles.label,
         tabBarShowLabel: true,
       }}>

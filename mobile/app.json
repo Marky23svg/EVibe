@@ -30,7 +30,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow EVibe to use your location to find nearby charging stations."
+          "locationAlwaysAndWhenInUsePermission": "Allow GoGreen to use your location to find nearby charging stations."
         }
       ],
       [

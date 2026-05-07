@@ -16,7 +16,7 @@ app.use('/api/expenses', require('./src/routes/expenses'));
 app.use('/api/incomes', require('./src/routes/incomes'));
 app.use('/api/gtfs', require('./src/routes/gtfs'));
 
-app.get('/', (req, res) => res.json({ message: 'EVibe API running' }));
+app.get('/', (req, res) => res.json({ message: 'GoGreen API running' }));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));

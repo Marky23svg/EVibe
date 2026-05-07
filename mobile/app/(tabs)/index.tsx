@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, StatusBar, Dimensions, Animated, PanResponder, ActivityIndicator,
+  ScrollView, StatusBar, Dimensions, Animated, PanResponder, ActivityIndicator, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline } from 'react-native-maps';
@@ -48,6 +48,16 @@ export default function MapScreen() {
   const [commuteSteps, setCommuteSteps] = useState<any[]>([]);
   const [commuteSuggestions, setCommuteSuggestions] = useState<any[]>([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState(0);
+
+  const resetRoute = () => {
+    setRouteActive(false);
+    setRouteCoords([]);
+    setRouteInfo(null);
+    setCommuteSteps([]);
+    setCommuteSuggestions([]);
+    setSelectedSuggestion(0);
+    snapTo(PEEK);
+  };
   const [savingTrip, setSavingTrip] = useState(false);
   const originTimeout = useRef<any>(null);
   const destTimeout = useRef<any>(null);
@@ -176,9 +186,21 @@ export default function MapScreen() {
 
   const useCurrentLocation = async () => {
     if (!userLocation) return;
-    setOrigin('📍 My Location');
     setOriginCoords(userLocation);
     setOriginSuggestions([]);
+    setOrigin('Getting location...');
+    try {
+      const results = await Location.reverseGeocodeAsync(userLocation);
+      if (results.length > 0) {
+        const a = results[0];
+        const parts = [a.name, a.street, a.district, a.city].filter(Boolean);
+        setOrigin(parts.join(', ') || '📍 My Location');
+      } else {
+        setOrigin('📍 My Location');
+      }
+    } catch {
+      setOrigin('📍 My Location');
+    }
     loadNearbyStations(userLocation);
   };
 
@@ -195,7 +217,7 @@ export default function MapScreen() {
         const result = await getCommuteRoute(from, to);
         setSelectedSuggestion(0);
         setCommuteSuggestions(result.suggestions);
-        setRouteInfo({ distanceKm: result.totalDistanceKm.toString(), durationMin: result.suggestions[0]?.totalDuration || 0 });
+        setRouteInfo({ distanceKm: result.totalDistanceKm.toFixed(2), durationMin: result.suggestions[0]?.totalDuration || 0 });
         setRouteActive(true);
         snapTo(FULL);
         // Draw first suggestion coords on map — fit bounds only
@@ -212,6 +234,7 @@ export default function MapScreen() {
         setRouteCoords(result.coordinates);
         setRouteInfo({ distanceKm: result.distanceKm, durationMin: result.durationMin });
         setRouteActive(true);
+        snapTo(FULL);
         const data = await fetchStations(to.latitude, to.longitude);
         setSTATIONS(data);
         mapRef.current?.fitToCoordinates(result.coordinates, {
@@ -245,6 +268,7 @@ export default function MapScreen() {
       setRouteCoords(result.coordinates);
       setRouteInfo({ distanceKm: result.distanceKm, durationMin: result.durationMin });
       setRouteActive(true);
+      snapTo(FULL);
       mapRef.current?.fitToCoordinates(result.coordinates, {
         edgePadding: { top: 120, right: 40, bottom: FULL + 20, left: 40 },
         animated: true,
@@ -329,15 +353,51 @@ export default function MapScreen() {
         )}
       </MapView>
 
+      {/* Floating back button + route info strip when viewing route */}
+      {routeActive && (
+        <TouchableOpacity style={styles.routeBackBtn} onPress={resetRoute}>
+          <Ionicons name="arrow-back" size={20} color={EV.text} />
+          <Text style={styles.routeBackText}>Back</Text>
+        </TouchableOpacity>
+      )}
+
+      {routeActive && routeInfo && (
+        <View style={styles.routeFloatingBar}>
+          <View style={styles.routeFloatItem}>
+            <Ionicons name="navigate" size={13} color={EV.primary} />
+            <Text style={styles.routeFloatVal}>{routeInfo.distanceKm} km</Text>
+          </View>
+          <View style={styles.routeFloatDivider} />
+          <View style={styles.routeFloatItem}>
+            <Ionicons name="time-outline" size={13} color={EV.accent} />
+            <Text style={styles.routeFloatVal}>{routeInfo.durationMin} min</Text>
+          </View>
+          <View style={styles.routeFloatDivider} />
+          <TouchableOpacity style={styles.routeFloatSave} onPress={handleSaveTrip} disabled={savingTrip}>
+            {savingTrip
+              ? <ActivityIndicator size="small" color={EV.bg} />
+              : <><Ionicons name="leaf" size={13} color={EV.bg} /><Text style={styles.routeFloatSaveText}>Save</Text></>
+            }
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Search overlay */}
       <SafeAreaView edges={['top']} style={styles.safeTop}>
-        <View style={styles.searchPanel}>
+        {/* App header — hidden when viewing route */}
+        {!routeActive && (
+          <>
+            <View style={styles.appHeader}>
+              <Image source={require('@/assets/images/logoGogreen.jpeg')} style={styles.appHeaderLogo} />
+              <Text style={styles.appHeaderTitle}>GoGreen</Text>
+            </View>
+            <View style={styles.searchPanel}>
           {/* Place A */}
           <View style={styles.inputRow}>
             <View style={styles.dotA}><View style={styles.dotAInner} /></View>
             <TextInput
               style={styles.searchText}
-              placeholder="Place A — Starting point"
+              placeholder="Origin"
               placeholderTextColor={EV.textDim}
               value={origin}
               onChangeText={handleOriginChange}
@@ -373,7 +433,7 @@ export default function MapScreen() {
             <View style={styles.dotB} />
             <TextInput
               style={styles.searchText}
-              placeholder="Place B — Destination"
+              placeholder="Set Location"
               placeholderTextColor={EV.textDim}
               value={destination}
               onChangeText={handleDestChange}
@@ -454,6 +514,8 @@ export default function MapScreen() {
             </View>
           )}
         </View>
+          </>
+        )}
       </SafeAreaView>
 
       {/* Map controls */}
@@ -474,7 +536,7 @@ export default function MapScreen() {
           <Animated.View style={[styles.handleBar, { transform: [{ scaleX: handleScale }] }]} />
           <View style={styles.peekRow}>
             <View style={styles.peekLeft}>
-              <Text style={styles.sheetTitle}>NEARBY STATIONS</Text>
+              <Text style={styles.sheetTitle}>{commuteSuggestions.length > 0 ? 'SELECT ROUTE' : 'NEARBY STATIONS'}</Text>
               <View style={styles.sheetBadge}>
                 <Text style={styles.sheetBadgeText}>{STATIONS.length}</Text>
               </View>
@@ -531,7 +593,7 @@ export default function MapScreen() {
               {commuteSuggestions.map((s: any, i: number) => (
                 <TouchableOpacity
                   key={i}
-                  style={[styles.suggestionTab, selectedSuggestion === i && { backgroundColor: s.color, borderColor: s.color }]}
+                  style={[styles.suggestionTab, selectedSuggestion === i && { backgroundColor: EV.primary, borderColor: EV.primary }]}
                   onPress={() => {
                     setSelectedSuggestion(i);
                     const coords = s.steps.flatMap((st: any) => st.coordinates || []);
@@ -550,10 +612,10 @@ export default function MapScreen() {
             {commuteSuggestions[selectedSuggestion] && (() => {
               const suggestion = commuteSuggestions[selectedSuggestion];
               return (
-                <View style={[styles.journeyCard, { borderColor: suggestion.color }]}>
+                <View style={[styles.journeyCard, { borderColor: EV.primary }]}>
                   <View style={styles.journeyHeader}>
                     <View style={styles.journeyHeaderLeft}>
-                      <View style={[styles.journeyBadge, { backgroundColor: suggestion.color }]}>
+                      <View style={[styles.journeyBadge, { backgroundColor: EV.primary }]}>
                         <Text style={styles.journeyBadgeText}>{suggestion.line}</Text>
                       </View>
                       <View>
@@ -653,6 +715,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: EV.bg },
   safeTop: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
 
+  appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 8, marginTop: 4 },
+  appHeaderLogo: { width: 36, height: 36, borderRadius: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
+  appHeaderTitle: { fontSize: 18, fontWeight: '800', color: EV.text },
+
   searchPanel: {
     marginHorizontal: 12,
     backgroundColor: EV.bgCard + 'F8',
@@ -692,6 +758,60 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   saveTripText: { color: EV.bg, fontSize: 13, fontWeight: '800' },
+
+  routeBackBtn: {
+    position: 'absolute',
+    top: 56,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: EV.bgCard + 'F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: EV.border,
+    zIndex: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  routeBackText: { color: EV.text, fontSize: 13, fontWeight: '700' },
+
+  routeFloatingBar: {
+    position: 'absolute',
+    top: 56,
+    left: 100,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: EV.bgCard + 'F0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: EV.border,
+    zIndex: 15,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  routeFloatItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  routeFloatDivider: { width: 1, height: 14, backgroundColor: EV.border },
+  routeFloatVal: { fontSize: 12, fontWeight: '700', color: EV.text },
+  routeFloatSave: {
+    marginLeft: 'auto' as any,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: EV.primary, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  routeFloatSaveText: { color: EV.bg, fontSize: 11, fontWeight: '800' },
 
   mapControls: { position: 'absolute', right: 16, gap: 10, zIndex: 5 },
   mapBtn: {

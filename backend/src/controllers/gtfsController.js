@@ -2,7 +2,7 @@ const { getNearbyStops } = require('../utils/nearbyStops');
 const { getRouteByNumber, getRouteById } = require('../utils/routeLookup');
 const { getStopsForRoute, getRoutesForStop } = require('../utils/routeStops');
 const { searchRoutesByKeyword } = require('../utils/corridorSearch');
-const { load, stopsById, shapeCoordsByRoute } = require('../utils/gtfsLoader');
+const { load, stopsById, shapeCoordsByRoute, isRouteAvailable } = require('../utils/gtfsLoader');
 
 // GET /api/gtfs/nearby?lat=14.5&lon=120.9&radius=500
 exports.nearby = (req, res) => {
@@ -116,6 +116,7 @@ exports.commute = (req, res) => {
         if (fromIdx === -1) continue;
 
         const isTrain = fromRoute.type === 2;
+        if (isTrain && !isRouteAvailable(fromRoute.id)) continue;
 
         // Find the closest stop on this route to the destination
         let bestStop = null;

@@ -50,6 +50,21 @@ export const geocode = async (address: string) => {
   return { latitude: lat, longitude: lng, label: feature.properties.label };
 };
 
+export const reverseGeocode = async (latitude: number, longitude: number) => {
+  const res = await orsClient.get('https://api.openrouteservice.org/geocode/reverse', {
+    params: {
+      api_key: ORS_KEY,
+      'point.lat': latitude,
+      'point.lon': longitude,
+      size: 1,
+    },
+    headers: { 'Accept': 'application/json' },
+  });
+  const feature = res.data.features[0];
+  if (!feature) throw new Error('Location not found');
+  return feature.properties.label;
+};
+
 export const autoComplete = async (text: string, lat?: number, lng?: number) => {
   const res = await orsClient.get('https://api.openrouteservice.org/geocode/autocomplete', {
     params: {

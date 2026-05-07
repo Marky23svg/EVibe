@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { EV } from '@/constants/theme';
 import * as Location from 'expo-location';
-import { getRoute, geocode, autoComplete } from '@/services/ors';
+import { getRoute, geocode, autoComplete, reverseGeocode } from '@/services/ors';
 import { createTrip, calculateTripCarbon } from '@/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, StatusBar, ActivityIndicator,
+  ScrollView, StatusBar, ActivityIndicator, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -67,9 +67,12 @@ export default function StationsScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Charging Stations</Text>
-          <Text style={styles.headerSub}>{loading ? 'Loading...' : `${filtered.length} stations found near you`}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Image source={require('@/assets/images/logoGogreen.jpeg')} style={styles.headerLogo} />
+          <View>
+            <Text style={styles.headerTitle}>Charging Stations</Text>
+            <Text style={styles.headerSub}>{loading ? 'Loading...' : `${filtered.length} stations found near you`}</Text>
+          </View>
         </View>
         <View style={styles.headerBadge}>
           <Ionicons name="flash" size={14} color={EV.bg} />
@@ -248,6 +251,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: EV.border,
   },
+  headerLogo: { width: 40, height: 40, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
   headerTitle: { fontSize: 20, fontWeight: '800', color: EV.text },
   headerSub: { fontSize: 12, color: EV.textMuted, marginTop: 2 },
   headerBadge: {

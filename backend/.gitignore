@@ -1,4 +1,18 @@
+# Environment
 .env
+.env.*
+
+# Dependencies
 node_modules/
+
+# OTP (large binary files and generated data)
 otp/
+gtfs_extracted/
+
+# Logs
 server.log
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

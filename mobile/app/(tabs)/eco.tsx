@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, StatusBar, ActivityIndicator, TouchableOpacity, Alert,
+  View, Text, StyleSheet, ScrollView, StatusBar, ActivityIndicator, TouchableOpacity, Alert, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -148,21 +148,6 @@ export default function EcoScreen() {
     ]);
   };
 
-  const handleLogout = async () => {
-    Alert.alert('Logout', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: async () => {
-          await AsyncStorage.removeItem('token');
-          await AsyncStorage.removeItem('user');
-          router.replace('/login');
-        },
-      },
-    ]);
-  };
-
   const { overall: score, budget, carbon, efficiency } = scores;
   const color = getScoreColor(score);
   const stars = getStars(score);
@@ -199,18 +184,18 @@ export default function EcoScreen() {
       <StatusBar barStyle="light-content" backgroundColor={EV.bg} />
 
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Eco Dashboard</Text>
-          <Text style={styles.headerSub}>Carbon footprint & eco score</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Image source={require('@/assets/images/logoGogreen.jpeg')} style={styles.headerLogo} />
+          <View>
+            <Text style={styles.headerTitle}>Eco Dashboard</Text>
+            <Text style={styles.headerSub}>Carbon footprint & eco score</Text>
+          </View>
         </View>
         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
           <View style={[styles.starBadge, { backgroundColor: EV.warning }]}>
             <Ionicons name="star" size={14} color={EV.bg} />
             <Text style={styles.starBadgeText}>{stars}/5</Text>
           </View>
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-            <Ionicons name="log-out-outline" size={20} color={EV.danger} />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -346,11 +331,11 @@ const styles = StyleSheet.create({
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
   loadingText: { fontSize: 14, color: EV.textMuted, fontWeight: '600' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: EV.border },
+  headerLogo: { width: 40, height: 40, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
   headerTitle: { fontSize: 20, fontWeight: '800', color: EV.text },
   headerSub: { fontSize: 12, color: EV.textMuted, marginTop: 2 },
   starBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 7 },
   starBadgeText: { fontSize: 13, fontWeight: '800', color: EV.bg },
-  logoutBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: EV.danger + '20', alignItems: 'center', justifyContent: 'center' },
   heroCard: { margin: 16, backgroundColor: EV.bgCard, borderRadius: 24, padding: 28, alignItems: 'center', borderWidth: 1, borderColor: EV.border, overflow: 'hidden' },
   heroGlow: { position: 'absolute', top: -80, width: 300, height: 300, borderRadius: 150 },
   ringContainer: { alignItems: 'center', justifyContent: 'center', marginBottom: 20, width: 160, height: 160 },

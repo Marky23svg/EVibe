@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Dimensions, Alert, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Dimensions, Alert, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { EV } from '@/constants/theme';
@@ -565,7 +565,10 @@ export default function BudgetScreen() {
       <StatusBar barStyle="light-content" backgroundColor={EV.bg} />
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Budget Tracker</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Image source={require('@/assets/images/logoGogreen.jpeg')} style={styles.headerLogo} />
+          <Text style={styles.headerTitle}>Budget Tracker</Text>
+        </View>
       </View>
 
       <View style={styles.tabs}>
@@ -603,6 +606,7 @@ export default function BudgetScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: EV.bg },
   header: { paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: EV.border },
+  headerLogo: { width: 40, height: 40, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
   headerTitle: { fontSize: 20, fontWeight: '800', color: EV.text },
   tabs: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: EV.border },
   tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10, backgroundColor: EV.bgCard },

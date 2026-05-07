@@ -14,6 +14,8 @@ const tripsByRoute = new Map();
 const stopTimesByTrip = new Map();
 const shapesByTrip = new Map();
 const shapeCoordsByRoute = new Map();
+const activeServiceIds = new Set();
+const activeRouteIds = new Set();
 
 const loadCSV = (filename) => {
   const content = fs.readFileSync(path.join(GTFS_DIR, filename), 'utf8');
@@ -23,6 +25,37 @@ const loadCSV = (filename) => {
 const load = () => {
   if (loaded) return;
   console.log('Loading GTFS data...');
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+  const weekdayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+  const calendarDatesPath = path.join(GTFS_DIR, 'calendar_dates.txt');
+  const calendarExceptions = new Map();
+  if (fs.existsSync(calendarDatesPath)) {
+    loadCSV('calendar_dates.txt').forEach(entry => {
+      if (!calendarExceptions.has(entry.service_id)) calendarExceptions.set(entry.service_id, new Map());
+      calendarExceptions.get(entry.service_id).set(entry.date, parseInt(entry.exception_type, 10));
+    });
+  }
+
+  loadCSV('calendar.txt').forEach(c => {
+    const serviceId = c.service_id;
+    const startDate = c.start_date;
+    const endDate = c.end_date;
+    const weekday = weekdayKeys[today.getDay()];
+    const isInRange = startDate <= todayStr && todayStr <= endDate;
+    const isWeeklyService = parseInt(c[weekday], 10) === 1;
+    const exceptionMap = calendarExceptions.get(serviceId);
+
+    if (exceptionMap && exceptionMap.has(todayStr)) {
+      const exceptionType = exceptionMap.get(todayStr);
+      if (exceptionType === 1) activeServiceIds.add(serviceId);
+      else if (exceptionType === 2) activeServiceIds.delete(serviceId);
+    } else if (isInRange && isWeeklyService) {
+      activeServiceIds.add(serviceId);
+    }
+  });
 
   // Load routes
   loadCSV('routes.txt').forEach(r => {
@@ -50,7 +83,7 @@ const load = () => {
   // Load trips
   loadCSV('trips.txt').forEach(t => {
     if (!tripsByRoute.has(t.route_id)) tripsByRoute.set(t.route_id, []);
-    tripsByRoute.get(t.route_id).push({ tripId: t.trip_id, shapeId: t.shape_id });
+    tripsByRoute.get(t.route_id).push({ tripId: t.trip_id, shapeId: t.shape_id, serviceId: t.service_id });
   });
 
   // Load shapes
@@ -82,7 +115,10 @@ const load = () => {
     const trips = tripsByRoute.get(routeId) || [];
     if (trips.length === 0) return;
 
-    const firstTrip = trips[0];
+    const activeTrips = trips.filter(t => activeServiceIds.has(t.serviceId));
+    if (activeTrips.length > 0) activeRouteIds.add(routeId);
+
+    const firstTrip = activeTrips.length > 0 ? activeTrips[0] : trips[0];
 
     // Store shape coords for this route
     if (firstTrip.shapeId && shapesByTrip.has(firstTrip.shapeId)) {
@@ -104,6 +140,8 @@ const load = () => {
   console.log(`GTFS loaded: ${routesById.size} routes, ${stopsById.size} stops`);
 };
 
+const isRouteAvailable = (routeId) => activeRouteIds.has(routeId);
+
 module.exports = {
   load,
   routesByNumber,
@@ -114,4 +152,5 @@ module.exports = {
   tripsByRoute,
   stopTimesByTrip,
   shapeCoordsByRoute,
+  isRouteAvailable,
 };

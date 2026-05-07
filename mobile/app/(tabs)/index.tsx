@@ -12,8 +12,10 @@ import { fetchStations } from '@/services/ocm';
 import { getRoute, geocode, autoComplete } from '@/services/ors';
 import { getCommuteRoute } from '@/services/commute';
 import { useRouter } from 'expo-router';
-import { createTrip, calculateTripCarbon } from '@/services/api';
+import { createTrip, calculateTripCarbon, addExpense } from '@/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STATIONS as TRAIN_STATIONS, LINE_COLORS, resolveLineSegment } from '@/data/trainStations';
+import { JEEP_SHAPES, RAIL_SHAPES } from '@/data/transitShapes';
 
 const { height } = Dimensions.get('window');
 const PEEK = 72;
@@ -48,6 +50,7 @@ export default function MapScreen() {
   const [commuteSteps, setCommuteSteps] = useState<any[]>([]);
   const [commuteSuggestions, setCommuteSuggestions] = useState<any[]>([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState(0);
+  const [showTransitLayer, setShowTransitLayer] = useState(false);
 
   const resetRoute = () => {
     setRouteActive(false);
@@ -297,11 +300,13 @@ export default function MapScreen() {
         return;
       }
 
-      // For commute mode, use the selected suggestion's distance
+      // For commute mode, use the selected suggestion's distance and fare
       let tripDistance = parseFloat(routeInfo.distanceKm);
+      let tripFare = 0;
       if (mode === 'commute' && commuteSuggestions.length > 0) {
         const selectedRoute = commuteSuggestions[selectedSuggestion];
         tripDistance = selectedRoute.totalDistanceKm || tripDistance;
+        tripFare = selectedRoute.totalFare || 0;
       }
 
       const tripRes = await createTrip({
@@ -310,8 +315,20 @@ export default function MapScreen() {
         destination: destination || 'Place B',
         distance: tripDistance,
         mode,
-        budget: 0,
+        budget: tripFare,
       });
+
+      // Automatically add fare to budget if it's a commute trip with a cost
+      if (tripFare > 0) {
+        await addExpense({
+          userId: user.id,
+          category: 'commute',
+          amount: tripFare,
+          description: `Commute: ${origin || 'A'} to ${destination || 'B'}`,
+          date: new Date().toISOString(),
+          tripId: tripRes.data._id
+        });
+      }
 
       await calculateTripCarbon(tripRes.data._id, tripDistance, mode);
       await AsyncStorage.setItem('activeTrip', JSON.stringify(tripRes.data));
@@ -339,6 +356,52 @@ export default function MapScreen() {
         showsUserLocation
         showsMyLocationButton={false}
         showsCompass={false}>
+        
+        {/* Transit Network Layer (All Lines) */}
+        {showTransitLayer && Object.keys(RAIL_SHAPES).map(lineId => (
+          <Polyline 
+            key={`transit-line-${lineId}`} 
+            coordinates={RAIL_SHAPES[lineId]} 
+            strokeColor={LINE_COLORS[lineId]} 
+            strokeWidth={3} 
+            lineDashPattern={[1]}
+            zIndex={1}
+          />
+        ))}
+
+        {/* Jeepney Corridor Layer */}
+        {showTransitLayer && JEEP_SHAPES.map((shape, idx) => (
+          <Polyline 
+            key={`jeep-shape-${idx}`} 
+            coordinates={shape} 
+            strokeColor={EV.info} 
+            strokeWidth={2} 
+            lineDashPattern={[2, 4]}
+            zIndex={0}
+          />
+        ))}
+
+        {showTransitLayer && TRAIN_STATIONS.map(s => (
+          <Marker 
+            key={`transit-dot-${s.id}`} 
+            coordinate={s.coordinate} 
+            anchor={{ x: 0.5, y: 0.5 }}
+            zIndex={2}
+          >
+            <View style={{ 
+              width: 10, 
+              height: 10, 
+              borderRadius: 5, 
+              backgroundColor: LINE_COLORS[s.line], 
+              borderWidth: 1.5, 
+              borderColor: '#FFF',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.3,
+              shadowRadius: 1,
+            }} />
+          </Marker>
+        ))}
         {stationMarkers}
         {/* Draw route polylines - separate line for each step with geometry */}
         {mode === 'commute' && commuteSuggestions.length > 0 && commuteSuggestions[selectedSuggestion]?.steps.map((step: any, idx: number) => {
@@ -353,16 +416,13 @@ export default function MapScreen() {
         )}
       </MapView>
 
-      {/* Floating back button + route info strip when viewing route */}
-      {routeActive && (
-        <TouchableOpacity style={styles.routeBackBtn} onPress={resetRoute}>
-          <Ionicons name="arrow-back" size={20} color={EV.text} />
-          <Text style={styles.routeBackText}>Back</Text>
-        </TouchableOpacity>
-      )}
 
       {routeActive && routeInfo && (
         <View style={styles.routeFloatingBar}>
+          <TouchableOpacity style={styles.routeFloatBack} onPress={resetRoute}>
+            <Ionicons name="close" size={16} color={EV.textMuted} />
+          </TouchableOpacity>
+          <View style={styles.routeFloatDivider} />
           <View style={styles.routeFloatItem}>
             <Ionicons name="navigate" size={13} color={EV.primary} />
             <Text style={styles.routeFloatVal}>{routeInfo.distanceKm} km</Text>
@@ -373,10 +433,14 @@ export default function MapScreen() {
             <Text style={styles.routeFloatVal}>{routeInfo.durationMin} min</Text>
           </View>
           <View style={styles.routeFloatDivider} />
-          <TouchableOpacity style={styles.routeFloatSave} onPress={handleSaveTrip} disabled={savingTrip}>
+          <TouchableOpacity 
+            style={[styles.routeFloatSave, savingTrip && { opacity: 0.7 }]} 
+            onPress={handleSaveTrip} 
+            disabled={savingTrip}
+          >
             {savingTrip
               ? <ActivityIndicator size="small" color={EV.bg} />
-              : <><Ionicons name="leaf" size={13} color={EV.bg} /><Text style={styles.routeFloatSaveText}>Save</Text></>
+              : <><Ionicons name="leaf" size={13} color={EV.bg} /><Text style={styles.routeFloatSaveText}>Save Trip</Text></>
             }
           </TouchableOpacity>
         </View>
@@ -387,10 +451,6 @@ export default function MapScreen() {
         {/* App header — hidden when viewing route */}
         {!routeActive && (
           <>
-            <View style={styles.appHeader}>
-              <Image source={require('@/assets/images/logoGogreen.jpeg')} style={styles.appHeaderLogo} />
-              <Text style={styles.appHeaderTitle}>GoGreen</Text>
-            </View>
             <View style={styles.searchPanel}>
           {/* Place A */}
           <View style={styles.inputRow}>
@@ -523,8 +583,11 @@ export default function MapScreen() {
         <TouchableOpacity style={styles.mapBtn} onPress={locateMe}>
           <Ionicons name="locate" size={20} color={EV.primary} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.mapBtn}>
-          <Ionicons name="layers-outline" size={20} color={EV.textMuted} />
+        <TouchableOpacity 
+          style={[styles.mapBtn, showTransitLayer && { backgroundColor: EV.primary }]} 
+          onPress={() => setShowTransitLayer(!showTransitLayer)}
+        >
+          <Ionicons name="layers" size={20} color={showTransitLayer ? EV.bg : EV.textMuted} />
         </TouchableOpacity>
       </Animated.View>
 
@@ -590,64 +653,75 @@ export default function MapScreen() {
         ) : commuteSuggestions.length > 0 ? (
           <ScrollView style={styles.sheetContent} showsVerticalScrollIndicator={false}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionTabs}>
-              {commuteSuggestions.map((s: any, i: number) => (
-                <TouchableOpacity
-                  key={i}
-                  style={[styles.suggestionTab, selectedSuggestion === i && { backgroundColor: EV.primary, borderColor: EV.primary }]}
-                  onPress={() => {
-                    setSelectedSuggestion(i);
-                    const coords = s.steps.flatMap((st: any) => st.coordinates || []);
-                    if (coords.length > 1) {
-                      mapRef.current?.fitToCoordinates(coords, {
-                        edgePadding: { top: 260, right: 40, bottom: FULL + 20, left: 40 },
-                        animated: true,
-                      });
-                    }
-                  }}>
-                  <Text style={[styles.suggestionTabText, selectedSuggestion === i && { color: EV.bg }]}>{i + 1}</Text>
-                  <Text style={[styles.suggestionTabDur, selectedSuggestion === i && { color: EV.bg }]}>{s.totalDuration}m</Text>
-                </TouchableOpacity>
-              ))}
+              {commuteSuggestions.map((s: any, i: number) => {
+                const label = s.line.includes('Fastest') ? 'FAST' : s.line.includes('Cheapest') ? 'CHEAP' : `${i + 1}`;
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.suggestionTab, selectedSuggestion === i && { backgroundColor: EV.primary, borderColor: EV.primary }]}
+                    onPress={() => {
+                      setSelectedSuggestion(i);
+                      const coords = s.steps.flatMap((st: any) => st.coordinates || []);
+                      if (coords.length > 1) {
+                        mapRef.current?.fitToCoordinates(coords, {
+                          edgePadding: { top: 260, right: 40, bottom: FULL + 20, left: 40 },
+                          animated: true,
+                        });
+                      }
+                    }}>
+                    <Text style={[styles.suggestionTabText, selectedSuggestion === i && { color: EV.bg }]}>{label}</Text>
+                    <Text style={[styles.suggestionTabDur, selectedSuggestion === i && { color: EV.bg }]}>{s.totalDuration}m</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
             {commuteSuggestions[selectedSuggestion] && (() => {
               const suggestion = commuteSuggestions[selectedSuggestion];
               return (
-                <View style={[styles.journeyCard, { borderColor: EV.primary }]}>
+                <View style={styles.journeyCard}>
                   <View style={styles.journeyHeader}>
                     <View style={styles.journeyHeaderLeft}>
                       <View style={[styles.journeyBadge, { backgroundColor: EV.primary }]}>
+                        <Ionicons name="navigate" size={14} color={EV.bg} />
                         <Text style={styles.journeyBadgeText}>{suggestion.line}</Text>
                       </View>
                       <View>
                         <Text style={styles.journeyDuration}>{suggestion.totalDuration} min</Text>
-                        <Text style={styles.journeyFare}>₱{suggestion.totalFare} estimated</Text>
+                        <Text style={styles.journeyFare}>Total Fare: ₱{suggestion.totalFare}</Text>
                       </View>
                     </View>
+                    <View style={styles.journeyHeaderRight}>
+                       <Text style={styles.journeyDist}>{(suggestion.totalDistanceKm || 0).toFixed(1)} km</Text>
+                    </View>
                   </View>
+                  
                   <View style={styles.timeline}>
-                    {suggestion.steps.map((step: any, i: number) => (
-                      <View key={i} style={styles.timelineRow}>
-                        <View style={styles.timelineLeft}>
-                          <View style={[styles.timelineIcon, { backgroundColor: step.color + '20', borderColor: step.color }]}>
-                            <Ionicons name={step.type === 'walk' ? 'walk' : step.type === 'train' ? 'train' : step.type === 'jeep' ? 'car' : 'bus'} size={14} color={step.color} />
-                          </View>
-                          {i < suggestion.steps.length - 1 && (
-                            <View style={[styles.timelineLine, { backgroundColor: step.color + '40' }]} />
-                          )}
-                        </View>
-                        <View style={styles.timelineContent}>
-                          <Text style={styles.timelineLabel}>{step.label}</Text>
-                          <Text style={styles.timelineDetail}>{step.detail}</Text>
-                          {step.duration > 0 && (
-                            <View style={styles.timelineDurationRow}>
-                              <Ionicons name="time-outline" size={10} color={EV.textDim} />
-                              <Text style={styles.timelineDuration}>{step.duration} min</Text>
-                              {step.fare > 0 && <Text style={styles.timelineFare}>₱{step.fare}</Text>}
+                    {suggestion.steps.map((step: any, i: number) => {
+                      const isJeep = step.type === 'jeep';
+                      const isTrain = step.type === 'train';
+                      const isBus = step.type === 'bus';
+                      const iconName = step.type === 'walk' ? 'walk' : isTrain ? 'train' : isJeep ? 'bus' : 'bus';
+                      
+                      return (
+                        <View key={i} style={styles.timelineRow}>
+                          <View style={styles.timelineLeft}>
+                            <View style={[styles.timelineIcon, { backgroundColor: step.color + '20', borderColor: step.color }]}>
+                              <Ionicons name={iconName as any} size={14} color={step.color} />
                             </View>
-                          )}
+                            {i < suggestion.steps.length - 1 && (
+                              <View style={[styles.timelineLine, { backgroundColor: step.color + '40' }]} />
+                            )}
+                          </View>
+                          <View style={styles.timelineContent}>
+                            <View style={styles.timelineMain}>
+                              <Text style={styles.timelineLabel}>{step.label}</Text>
+                              {step.fare > 0 && <Text style={styles.stepFareBadge}>₱{step.fare}</Text>}
+                            </View>
+                            <Text style={styles.timelineDetail}>{step.detail}</Text>
+                          </View>
                         </View>
-                      </View>
-                    ))}
+                      );
+                    })}
                   </View>
                 </View>
               );
@@ -759,59 +833,38 @@ const styles = StyleSheet.create({
   },
   saveTripText: { color: EV.bg, fontSize: 13, fontWeight: '800' },
 
-  routeBackBtn: {
-    position: 'absolute',
-    top: 56,
-    left: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: EV.bgCard + 'F0',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: EV.border,
-    zIndex: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  routeBackText: { color: EV.text, fontSize: 13, fontWeight: '700' },
 
   routeFloatingBar: {
     position: 'absolute',
     top: 56,
-    left: 100,
+    left: 16,
     right: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: EV.bgCard + 'F0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    backgroundColor: EV.bgCard + 'F8',
+    borderRadius: 14,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
     borderWidth: 1,
     borderColor: EV.border,
     zIndex: 15,
-    gap: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
   },
-  routeFloatItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  routeFloatDivider: { width: 1, height: 14, backgroundColor: EV.border },
+  routeFloatBack: { padding: 12 },
+  routeFloatItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  routeFloatDivider: { width: 1, height: 20, backgroundColor: EV.border },
   routeFloatVal: { fontSize: 12, fontWeight: '700', color: EV.text },
   routeFloatSave: {
-    marginLeft: 'auto' as any,
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: EV.primary, borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 5,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: EV.primary, borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 10,
+    marginLeft: 4,
   },
-  routeFloatSaveText: { color: EV.bg, fontSize: 11, fontWeight: '800' },
+  routeFloatSaveText: { color: EV.bg, fontSize: 12, fontWeight: '800' },
 
   mapControls: { position: 'absolute', right: 16, gap: 10, zIndex: 5 },
   mapBtn: {
@@ -954,8 +1007,10 @@ const styles = StyleSheet.create({
     padding: 14, borderBottomWidth: 1, borderBottomColor: EV.border,
   },
   journeyHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  journeyBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  journeyBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
   journeyBadgeText: { color: EV.bg, fontSize: 11, fontWeight: '800' },
+  journeyHeaderRight: { alignItems: 'flex-end' },
+  journeyDist: { fontSize: 13, fontWeight: '700', color: EV.textMuted },
   journeyDuration: { color: EV.text, fontSize: 15, fontWeight: '800' },
   journeyFare: { color: EV.textMuted, fontSize: 11, marginTop: 2 },
   selectedBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1 },
@@ -970,8 +1025,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   timelineLine: { width: 2, flex: 1, marginVertical: 4, borderRadius: 1 },
-  timelineContent: { flex: 1, paddingBottom: 12 },
-  timelineLabel: { color: EV.text, fontSize: 13, fontWeight: '700', marginBottom: 2 },
+  timelineContent: { flex: 1, paddingBottom: 16 },
+  timelineMain: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
+  timelineLabel: { color: EV.text, fontSize: 13, fontWeight: '700' },
+  stepFareBadge: { fontSize: 10, fontWeight: '800', color: EV.primary, backgroundColor: EV.primary + '18', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   timelineDetail: { color: EV.textMuted, fontSize: 11, marginBottom: 4 },
   timelineDurationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   timelineDuration: { color: EV.textDim, fontSize: 10 },

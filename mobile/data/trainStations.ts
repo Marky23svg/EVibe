@@ -46,19 +46,20 @@ export const STATIONS: Station[] = [
   { id: 'lrt1-20', name: 'Baclaran LRT', line: 'LRT-1', order: 20, coordinate: { latitude: 14.5339, longitude: 120.998 }, fare_base: 12 },
 
   // LRT-2 (West to East)
-  { id: 'lrt2-1', name: 'Recto LRT', line: 'LRT-2', order: 1, coordinate: { latitude: 14.5987, longitude: 120.9823 }, fare_base: 12 },
-  { id: 'lrt2-2', name: 'Legarda', line: 'LRT-2', order: 2, coordinate: { latitude: 14.5998, longitude: 120.9934 }, fare_base: 12 },
-  { id: 'lrt2-3', name: 'Pureza', line: 'LRT-2', order: 3, coordinate: { latitude: 14.6009, longitude: 121.0045 }, fare_base: 12 },
-  { id: 'lrt2-4', name: 'V. Mapa', line: 'LRT-2', order: 4, coordinate: { latitude: 14.6020, longitude: 121.0156 }, fare_base: 12 },
-  { id: 'lrt2-5', name: 'J. Ruiz', line: 'LRT-2', order: 5, coordinate: { latitude: 14.6031, longitude: 121.0267 }, fare_base: 12 },
-  { id: 'lrt2-6', name: 'Gilmore', line: 'LRT-2', order: 6, coordinate: { latitude: 14.6042, longitude: 121.0323 }, fare_base: 12 },
-  { id: 'lrt2-7', name: 'Betty Go-Belmonte', line: 'LRT-2', order: 7, coordinate: { latitude: 14.6098, longitude: 121.0378 }, fare_base: 12 },
-  { id: 'lrt2-8', name: 'Cubao LRT', line: 'LRT-2', order: 8, coordinate: { latitude: 14.6154, longitude: 121.0489 }, fare_base: 12 },
-  { id: 'lrt2-9', name: 'Anonas', line: 'LRT-2', order: 9, coordinate: { latitude: 14.6198, longitude: 121.0534 }, fare_base: 12 },
-  { id: 'lrt2-10', name: 'Katipunan', line: 'LRT-2', order: 10, coordinate: { latitude: 14.6276, longitude: 121.0712 }, fare_base: 12 },
-  { id: 'lrt2-11', name: 'Santolan LRT', line: 'LRT-2', order: 11, coordinate: { latitude: 14.6223, longitude: 121.0860 }, fare_base: 12 },
-  { id: 'lrt2-12', name: 'Marikina-Pasig LRT', line: 'LRT-2', order: 12, coordinate: { latitude: 14.6219, longitude: 121.0948 }, fare_base: 12 },
-  { id: 'lrt2-13', name: 'Antipolo LRT', line: 'LRT-2', order: 13, coordinate: { latitude: 14.6152, longitude: 121.1221 }, fare_base: 12 },
+  { id: 'lrt2-1', name: 'Recto LRT', line: 'LRT-2', order: 1, coordinate: { latitude: 14.6030, longitude: 120.9835 }, fare_base: 12 },
+  { id: 'lrt2-2', name: 'Legarda', line: 'LRT-2', order: 2, coordinate: { latitude: 14.6008, longitude: 120.9935 }, fare_base: 12 },
+  { id: 'lrt2-3', name: 'Pureza', line: 'LRT-2', order: 3, coordinate: { latitude: 14.6015, longitude: 121.0048 }, fare_base: 12 },
+  { id: 'lrt2-4', name: 'V. Mapa', line: 'LRT-2', order: 4, coordinate: { latitude: 14.6025, longitude: 121.0158 }, fare_base: 12 },
+  { id: 'lrt2-5', name: 'J. Ruiz', line: 'LRT-2', order: 5, coordinate: { latitude: 14.6038, longitude: 121.0268 }, fare_base: 12 },
+  { id: 'lrt2-6', name: 'Gilmore', line: 'LRT-2', order: 6, coordinate: { latitude: 14.6050, longitude: 121.0325 }, fare_base: 12 },
+  { id: 'lrt2-7', name: 'Betty Go-Belmonte', line: 'LRT-2', order: 7, coordinate: { latitude: 14.6105, longitude: 121.0380 }, fare_base: 12 },
+  { id: 'lrt2-8', name: 'Cubao LRT', line: 'LRT-2', order: 8, coordinate: { latitude: 14.6160, longitude: 121.0490 }, fare_base: 12 },
+  { id: 'lrt2-9', name: 'Anonas', line: 'LRT-2', order: 9, coordinate: { latitude: 14.6205, longitude: 121.0535 }, fare_base: 12 },
+  { id: 'lrt2-10', name: 'Katipunan', line: 'LRT-2', order: 10, coordinate: { latitude: 14.6285, longitude: 121.0715 }, fare_base: 12 },
+  { id: 'lrt2-11', name: 'Santolan LRT', line: 'LRT-2', order: 11, coordinate: { latitude: 14.6225, longitude: 121.0863 }, fare_base: 12 },
+  { id: 'lrt2-12', name: 'Marikina-Pasig LRT', line: 'LRT-2', order: 12, coordinate: { latitude: 14.6195, longitude: 121.1012 }, fare_base: 12 },
+  { id: 'lrt2-13', name: 'Antipolo LRT', line: 'LRT-2', order: 13, coordinate: { latitude: 14.6152, longitude: 121.1223 }, fare_base: 12 },
+
 ];
 
 const getDistance = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => {

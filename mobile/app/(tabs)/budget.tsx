@@ -10,6 +10,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 const { width } = Dimensions.get('window');
 
 const EXPENSE_CATEGORIES = [
+  { key: 'commute', label: 'Commute', icon: 'bus', color: EV.info },
   { key: 'charging', label: 'Charging', icon: 'flash', color: EV.primary },
   { key: 'food', label: 'Food', icon: 'restaurant', color: EV.warning },
   { key: 'accommodation', label: 'Stay', icon: 'bed', color: EV.info },

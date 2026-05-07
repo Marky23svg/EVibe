@@ -12,7 +12,7 @@ exports.createTrip = async (req, res) => {
 
 exports.getTrips = async (req, res) => {
   try {
-    const trips = await Trip.find({ userId: req.query.userId });
+    const trips = await Trip.find({ userId: req.query.userId }).sort({ createdAt: -1 });
     res.json(trips);
   } catch (err) {
     res.status(500).json({ error: err.message });

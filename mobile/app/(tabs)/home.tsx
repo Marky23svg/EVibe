@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { EV } from '@/constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserExpenses, getIncomes, getTrips, deleteTrip } from '@/services/api';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 
 const EXPENSE_CATEGORIES = [
   { key: 'charging', label: 'Charging', icon: 'flash', color: EV.primary },
@@ -49,7 +49,12 @@ export default function HomeScreen() {
     loadData();
   }, []);
 
-  
+  useFocusEffect(
+    React.useCallback(() => {
+      loadData();
+    }, [])
+  );
+
 
   const loadData = async () => {
     setLoading(true);

@@ -387,10 +387,7 @@ export default function MapScreen() {
         {/* App header — hidden when viewing route */}
         {!routeActive && (
           <>
-            <View style={styles.appHeader}>
-              <Image source={require('@/assets/images/logoGogreen.jpeg')} style={styles.appHeaderLogo} />
-              <Text style={styles.appHeaderTitle}>GoGreen</Text>
-            </View>
+            
             <View style={styles.searchPanel}>
           {/* Place A */}
           <View style={styles.inputRow}>
@@ -663,7 +660,7 @@ export default function MapScreen() {
                 {stationsLoading && <ActivityIndicator size="small" color={EV.primary} style={{ marginLeft: 6 }} />}
               </View>
             )}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stationList}>
+            <ScrollView  showsVerticalScrollIndicator={false} contentContainerStyle={styles.stationList}>
               {(nearbyOriginStations.length > 0 ? nearbyOriginStations : STATIONS).map((s, index) => (
                 <TouchableOpacity key={`sheet-${s.id}-${index}`} style={styles.stationCard} onPress={() => handleStationPress(s.id)} activeOpacity={0.85}>
                   <View style={styles.stationCardTop}>
@@ -716,7 +713,7 @@ const styles = StyleSheet.create({
   safeTop: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
 
   appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 8, marginTop: 4 },
-  appHeaderLogo: { width: 36, height: 36, borderRadius: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
+  appHeaderLogo: { width: 36, height: 36, borderRadius: 10, shadowColor: '#a1a1a1', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
   appHeaderTitle: { fontSize: 18, fontWeight: '800', color: EV.text },
 
   searchPanel: {
@@ -853,12 +850,12 @@ const styles = StyleSheet.create({
   sheetBadge: { backgroundColor: EV.primary, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
   sheetBadgeText: { fontSize: 11, fontWeight: '800', color: EV.bg },
 
-  sheetContent: { paddingHorizontal: 16, paddingBottom: 16 },
+  sheetContent: { paddingHorizontal: 5, paddingBottom: 16 },
   nearbyHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   nearbyTitle: { fontSize: 11, fontWeight: '700', color: EV.primary, letterSpacing: 1.2 },
   stationList: { gap: 10, paddingRight: 16 },
   stationCard: {
-    width: 150, height: 180,
+    width: 380, height: 180,
     backgroundColor: EV.bgSurface, borderRadius: 16,
     padding: 12, borderWidth: 1, borderColor: EV.border,
   },
@@ -867,8 +864,8 @@ const styles = StyleSheet.create({
   stationCardIconFast: { backgroundColor: EV.primary },
   availPill: { backgroundColor: EV.bgCard, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2, borderWidth: 1, borderColor: EV.primaryDark },
   availPillEmpty: { borderColor: EV.danger },
-  availPillText: { fontSize: 9, color: EV.primary, fontWeight: '700' },
-  stationCardName: { fontSize: 12, fontWeight: '700', color: EV.text, marginBottom: 1 },
+  availPillText: { fontSize: 10, color: EV.primary, fontWeight: '700' },
+  stationCardName: { fontSize: 15, fontWeight: '700', color: EV.text, marginBottom: 1 },
   stationCardType: { fontSize: 10, color: EV.textMuted, marginBottom: 8 },
   stationCardDivider: { height: 1, backgroundColor: EV.border, marginBottom: 8 },
   stationCardStats: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },

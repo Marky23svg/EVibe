@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: EV.border,
   },
-  headerLogo: { width: 40, height: 40, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
+  headerLogo: { width: 40, height: 40, borderRadius: 10, shadowColor: '#a1a1a1', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
   headerTitle: { fontSize: 20, fontWeight: '800', color: EV.text },
   headerSub: { fontSize: 12, color: EV.textMuted, marginTop: 2 },
   headerBadge: {

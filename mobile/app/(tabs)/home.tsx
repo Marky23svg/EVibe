@@ -309,8 +309,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: EV.border,
   },
-  headerGreeting: { fontSize: 18, fontWeight: '400', color: EV.textMuted },
-  headerName: { fontSize: 20, fontWeight: '800', color: EV.text, marginTop: 2 },
+  headerGreeting: { fontSize: 15, fontWeight: '400', color: EV.textMuted, marginTop: -8 },
+  headerName: { fontSize: 25, fontWeight: '800', color: EV.text, marginTop: 1 },
   profileBtn: { 
     width: 40, 
     height: 40, 

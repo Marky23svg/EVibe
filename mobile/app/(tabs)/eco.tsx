@@ -60,11 +60,11 @@ function getScoreColor(score: number) {
 }
 
 function getMessage(score: number) {
-  if (score >= 90) return { title: 'Outstanding! 🏆', sub: "You're an eco champion!" };
-  if (score >= 75) return { title: 'Great job! 🌟', sub: 'Keep up the green driving!' };
-  if (score >= 60) return { title: 'Good effort! 👍', sub: 'Room to improve your score.' };
-  if (score >= 40) return { title: 'Keep improving! 💪', sub: 'Try optimizing your route.' };
-  return { title: "Let's do better! 🌱", sub: 'Check your budget & carbon tips.' };
+  if (score >= 90) return { title: 'Outstanding!', sub: "You're an eco champion!" };
+  if (score >= 75) return { title: 'Great job!', sub: 'Keep up the green driving!' };
+  if (score >= 60) return { title: 'Good effort!', sub: 'Room to improve your score.' };
+  if (score >= 40) return { title: 'Keep improving!', sub: 'Try optimizing your route.' };
+  return { title: "Let's do better!", sub: 'Check your budget & carbon tips.' };
 }
 
 export default function EcoScreen() {
@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
   loadingText: { fontSize: 14, color: EV.textMuted, fontWeight: '600' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: EV.border },
-  headerLogo: { width: 40, height: 40, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
+  headerLogo: { width: 40, height: 40, borderRadius: 10, shadowColor: '#a2a2a2', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
   headerTitle: { fontSize: 20, fontWeight: '800', color: EV.text },
   headerSub: { fontSize: 12, color: EV.textMuted, marginTop: 2 },
   starBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 7 },
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
   treesText: {},
   treesNum: { fontSize: 16, fontWeight: '800', color: EV.text },
   treesSub: { fontSize: 11, color: EV.textMuted },
-  reductionBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: EV.primary + '18', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: EV.primaryDark },
+  reductionBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: EV.primary + '18', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: EV.accentSoft },
   reductionText: { fontSize: 13, color: EV.primary, fontWeight: '700' },
   sectionTitle: { fontSize: 11, fontWeight: '700', color: EV.primary, letterSpacing: 1.5, marginHorizontal: 16, marginBottom: 12 },
   metricsCard: { marginHorizontal: 16, marginBottom: 20, backgroundColor: EV.bgCard, borderRadius: 20, borderWidth: 1, borderColor: EV.border, overflow: 'hidden' },

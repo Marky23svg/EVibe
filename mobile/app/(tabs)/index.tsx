@@ -303,7 +303,12 @@ export default function MapScreen() {
         setRouteInfo({ distanceKm: result.distanceKm, durationMin: result.durationMin });
         setRouteActive(true);
         snapTo(FULL);
-        loadNearbyStations(to);
+        if (mode === 'ev') {
+          loadNearbyStations(to); // Show stations at destination for EV mode
+        } else {
+          setNearbyOriginStations([]); // Clear stations for walking/biking
+          setSTATIONS([]);
+        }
         mapRef.current?.fitToCoordinates(result.coordinates, {
           edgePadding: { top: 260, right: 40, bottom: FULL + 20, left: 40 },
           animated: true,

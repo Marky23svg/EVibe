@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Alert, FlatList,
+  ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { EV } from '@/constants/theme';
 import * as Location from 'expo-location';
-import { getRoute, geocode, autoComplete, reverseGeocode } from '@/services/ors';
+import { getRoute, geocode, autoComplete } from '@/services/ors';
 import { createTrip, calculateTripCarbon } from '@/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -33,41 +33,77 @@ export default function SetupScreen() {
   const [originSuggestions, setOriginSuggestions] = useState<any[]>([]);
   const [destSuggestions, setDestSuggestions] = useState<any[]>([]);
   const [activeField, setActiveField] = useState<'origin' | 'dest' | null>(null);
+  const originRequestId = useRef(0);
+  const destRequestId = useRef(0);
 
   const selectedMode = MODES.find(m => m.key === mode)!;
 
-  const handleOriginChange = async (text: string) => {
+  const handleOriginChange = (text: string) => {
     setOrigin(text);
     setOriginCoords(null);
     setRouteInfo(null);
-    if (text.length < 3) { setOriginSuggestions([]); return; }
-    try {
-      const results = await autoComplete(text);
-      setOriginSuggestions(results);
-    } catch { setOriginSuggestions([]); }
   };
 
-  const handleDestChange = async (text: string) => {
+  const handleDestChange = (text: string) => {
     setDestination(text);
     setDestCoords(null);
     setRouteInfo(null);
-    if (text.length < 3) { setDestSuggestions([]); return; }
-    try {
-      const results = await autoComplete(text);
-      setDestSuggestions(results);
-    } catch { setDestSuggestions([]); }
   };
 
+  useEffect(() => {
+    if (activeField !== 'origin') return;
+    if (origin.length < 3) {
+      setOriginSuggestions([]);
+      return;
+    }
+
+    const requestId = ++originRequestId.current;
+    const timer = setTimeout(async () => {
+      try {
+        const results = await autoComplete(origin);
+        if (requestId === originRequestId.current) setOriginSuggestions(results);
+      } catch {
+        if (requestId === originRequestId.current) setOriginSuggestions([]);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [origin, activeField]);
+
+  useEffect(() => {
+    if (activeField !== 'dest') return;
+    if (destination.length < 3) {
+      setDestSuggestions([]);
+      return;
+    }
+
+    const requestId = ++destRequestId.current;
+    const timer = setTimeout(async () => {
+      try {
+        const results = await autoComplete(destination);
+        if (requestId === destRequestId.current) setDestSuggestions(results);
+      } catch {
+        if (requestId === destRequestId.current) setDestSuggestions([]);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [destination, activeField]);
+
   const selectOrigin = (s: any) => {
+    originRequestId.current += 1;
     setOrigin(s.label);
     setOriginCoords({ latitude: s.latitude, longitude: s.longitude });
     setOriginSuggestions([]);
+    setActiveField(null);
   };
 
   const selectDest = (s: any) => {
+    destRequestId.current += 1;
     setDestination(s.label);
     setDestCoords({ latitude: s.latitude, longitude: s.longitude });
     setDestSuggestions([]);
+    setActiveField(null);
   };
 
   const useCurrentLocation = async () => {

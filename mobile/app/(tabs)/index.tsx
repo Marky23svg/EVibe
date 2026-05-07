@@ -24,7 +24,7 @@ const FULL = 420;
 const MODES = [
   { key: 'walking', icon: 'walk', label: 'Walk', profile: 'foot-walking' },
   { key: 'biking', icon: 'bicycle', label: 'Bike', profile: 'cycling-regular' },
-  { key: 'commute', icon: 'bus', label: 'Bus', profile: 'driving-car' },
+  { key: 'commute', icon: 'bus', label: 'Transit', profile: 'driving-car' },
   { key: 'ev', icon: 'flash', label: 'EV', profile: 'driving-car' },
 ];
 
@@ -60,6 +60,12 @@ export default function MapScreen() {
     setCommuteSuggestions([]);
     setSelectedSuggestion(0);
     snapTo(PEEK);
+    // Clear all stations then reload only nearby stations at origin
+    setSTATIONS([]);
+    setNearbyOriginStations([]);
+    if (originCoords) {
+      loadNearbyStations(originCoords);
+    }
   };
   const [savingTrip, setSavingTrip] = useState(false);
   const originTimeout = useRef<any>(null);
@@ -79,35 +85,53 @@ export default function MapScreen() {
         setUserLocation(coords);
         const data = await fetchStations(coords.latitude, coords.longitude);
         setSTATIONS(data);
+        setNearbyOriginStations(data); // Set nearby stations at initial location
       }
     })();
   }, []);
 
-  // Automatic cache clearing for performance
+  // Aggressive cache clearing for performance
   useEffect(() => {
-    // Clear unused caches every 2 minutes
-    const cacheCleaner = setInterval(() => {
-      if (!routeActive) {
-        // Clear heavy state when route is inactive
-        setCommuteSuggestions([]);
-        setCommuteSteps([]);
-        setRouteCoords([]);
-        setNearbyOriginStations([]);
-        setOriginSuggestions([]);
-        setDestSuggestions([]);
-      }
-    }, 120000); // 2 minutes
-
-    // Memory pressure handler
-    const handleMemoryWarning = () => {
-      console.log('Memory warning received, clearing caches...');
+    // Immediate clear when route becomes inactive
+    if (!routeActive) {
       setCommuteSuggestions([]);
       setCommuteSteps([]);
       setRouteCoords([]);
-      setNearbyOriginStations([]);
       setOriginSuggestions([]);
       setDestSuggestions([]);
-      setSTATIONS([]);
+      // Trim stations to last 20 to save memory
+      setSTATIONS(prev => prev.slice(-20));
+    }
+  }, [routeActive]);
+
+  useEffect(() => {
+    // Clear unused caches every 30 seconds aggressively
+    const cacheCleaner = setInterval(() => {
+      if (!routeActive) {
+        // Clear all heavy state when route is inactive
+        setCommuteSuggestions([]);
+        setCommuteSteps([]);
+        setRouteCoords([]);
+        setOriginSuggestions([]);
+        setDestSuggestions([]);
+        setNearbyOriginStations([]);
+        // Aggressive: trim main stations list
+        setSTATIONS(prev => prev.slice(-15));
+        // Force garbage collection hint
+        if (global.gc) global.gc();
+      }
+    }, 30000); // 30 seconds
+
+    // Memory pressure handler - aggressive clearing
+    const handleMemoryWarning = () => {
+      console.log('Memory warning - aggressive cache clear...');
+      setCommuteSuggestions([]);
+      setCommuteSteps([]);
+      setRouteCoords([]);
+      setOriginSuggestions([]);
+      setDestSuggestions([]);
+      setNearbyOriginStations([]);
+      setSTATIONS(prev => prev.slice(-10)); // Keep only 10 stations
     };
 
     return () => {
@@ -262,6 +286,8 @@ export default function MapScreen() {
         setCommuteSuggestions(result.suggestions);
         setRouteInfo({ distanceKm: result.totalDistanceKm.toFixed(2), durationMin: result.suggestions[0]?.totalDuration || 0 });
         setRouteActive(true);
+        setNearbyOriginStations([]);
+        setSTATIONS([]); // Clear EV stations from map when using public transit
         snapTo(FULL);
         const firstSteps = result.suggestions[0]?.steps || [];
         const allCoords = firstSteps.flatMap((s: any) => s.coordinates || []);
@@ -542,7 +568,7 @@ export default function MapScreen() {
                 onFocus={() => setActiveField('dest')}
               />
               {(origin || destination) && (
-                <TouchableOpacity onPress={() => { setOrigin(''); setDestination(''); setOriginCoords(null); setDestCoords(null); setRouteActive(false); setRouteCoords([]); setRouteInfo(null); setNearbyOriginStations([]); }}>
+                <TouchableOpacity onPress={() => { setOrigin(''); setDestination(''); setOriginCoords(null); setDestCoords(null); setRouteActive(false); setRouteCoords([]); setRouteInfo(null); }}>
                   <Ionicons name="close-circle" size={16} color={EV.textDim} />
                 </TouchableOpacity>
               )}

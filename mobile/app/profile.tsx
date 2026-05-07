@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { EV } from '@/constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import axios from 'axios';
+import { API_BASE } from '@/constants/api';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -36,17 +38,30 @@ export default function ProfileScreen() {
     }
 
     try {
+      const trimmedName = editedName.trim();
+      
+      // Update backend first
+      const token = await AsyncStorage.getItem('token');
+      if (token) {
+        await axios.put(`${API_BASE}/api/auth/me`, { name: trimmedName }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+      
+      // Then update local storage
       const userStr = await AsyncStorage.getItem('user');
       if (userStr) {
         const userData = JSON.parse(userStr);
-        userData.name = editedName.trim();
+        userData.name = trimmedName;
         await AsyncStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
-        setIsEditing(false);
-        Alert.alert('Success', 'Name updated successfully');
       }
+      
+      setIsEditing(false);
+      Alert.alert('Success', 'Name updated successfully');
     } catch (error) {
-      Alert.alert('Error', 'Failed to update name');
+      console.log('Error saving user data:', error);
+      Alert.alert('Error', 'Failed to update name on server');
     }
   };
 

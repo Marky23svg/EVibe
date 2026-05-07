@@ -473,10 +473,6 @@ export default function BudgetScreen() {
   };
 
   const renderSummary = () => {
-    const maxYearlyExpense = yearlyData?.monthly?.length
-      ? Math.max(...yearlyData.monthly.map((m: any) => m.expenses || 0), 1)
-      : 1;
-
     return (
     <ScrollView showsVerticalScrollIndicator={false}>
       {monthlyData && (
@@ -537,18 +533,28 @@ export default function BudgetScreen() {
 
           <Text style={[styles.sectionTitle, { marginTop: 20, marginBottom: 10}]}>MONTHLY EXPENSES</Text>
           {yearlyData.monthly.map((m: any) => (
-            <View key={m.month} style={styles.trendRow}>
-              <Text style={styles.trendMonth}>{new Date(yearlyData.year, m.month - 1).toLocaleDateString('en', { month: 'short' })}</Text>
-              <View style={styles.trendTrack}>
-                <View
-                  style={[
-                    styles.trendBar,
-                    { width: `${(m.expenses / maxYearlyExpense) * 100}%` },
-                  ]}
-                />
-              </View>
-              <Text style={styles.trendExpenseValue}>₱{m.expenses.toFixed(0)}</Text>
-            </View>
+            (() => {
+              const expenseFillPct = m.income > 0
+                ? Math.min((m.expenses / m.income) * 100, 100)
+                : m.expenses > 0
+                  ? 100
+                  : 0;
+
+              return (
+                <View key={m.month} style={styles.trendRow}>
+                  <Text style={styles.trendMonth}>{new Date(yearlyData.year, m.month - 1).toLocaleDateString('en', { month: 'short' })}</Text>
+                  <View style={styles.trendTrack}>
+                    <View
+                      style={[
+                        styles.trendBar,
+                        { width: `${expenseFillPct}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.trendExpenseValue}>₱{m.expenses.toFixed(0)}</Text>
+                </View>
+              );
+            })()
           ))}
         </View>
       )}

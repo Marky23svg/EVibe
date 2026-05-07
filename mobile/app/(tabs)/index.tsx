@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, StatusBar, Dimensions, Animated, PanResponder, ActivityIndicator, Image,
+  ScrollView, StatusBar, Dimensions, Animated, PanResponder, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline } from 'react-native-maps';
@@ -9,7 +9,7 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { EV } from '@/constants/theme';
 import { fetchStations } from '@/services/ocm';
-import { getRoute, geocode, autoComplete } from '@/services/ors';
+import { getRoute, autoComplete } from '@/services/ors';
 import { getCommuteRoute } from '@/services/commute';
 import { useRouter } from 'expo-router';
 import { createTrip, calculateTripCarbon } from '@/services/api';
@@ -64,7 +64,7 @@ export default function MapScreen() {
 
   const mapRef = useRef<MapView>(null);
   const sheetAnim = useRef(new Animated.Value(PEEK)).current;
-  const startY = useRef(PEEK);         // sheet height when finger touches down
+  const startY = useRef(PEEK);
   const handleScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -102,8 +102,7 @@ export default function MapScreen() {
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > Math.abs(g.dx),
-    onPanResponderGrant: (_, g) => {
-      // capture current sheet height synchronously
+    onPanResponderGrant: () => {
       (sheetAnim as any)._value !== undefined
         ? (startY.current = (sheetAnim as any)._value)
         : null;
@@ -119,17 +118,16 @@ export default function MapScreen() {
       sheetAnim.setValue(next);
     },
     onPanResponderRelease: (_, g) => {
-      const flickUp   = g.vy < -0.3;
+      const flickUp = g.vy < -0.3;
       const flickDown = g.vy > 0.3;
-      const dragUp    = g.dy < -10;
-      const dragDown  = g.dy > 10;
+      const dragUp = g.dy < -10;
+      const dragDown = g.dy > 10;
 
       if (flickUp || dragUp) {
         snapTo(FULL, g.vy * 20);
       } else if (flickDown || dragDown) {
         snapTo(PEEK, g.vy * 20);
       } else {
-        // tiny movement — snap based on midpoint
         const cur = (sheetAnim as any)._value ?? startY.current;
         snapTo(cur > (PEEK + FULL) / 2 ? FULL : PEEK);
       }
@@ -220,7 +218,6 @@ export default function MapScreen() {
         setRouteInfo({ distanceKm: result.totalDistanceKm.toFixed(2), durationMin: result.suggestions[0]?.totalDuration || 0 });
         setRouteActive(true);
         snapTo(FULL);
-        // Draw first suggestion coords on map — fit bounds only
         const firstSteps = result.suggestions[0]?.steps || [];
         const allCoords = firstSteps.flatMap((s: any) => s.coordinates || []);
         if (allCoords.length > 1) {
@@ -297,7 +294,6 @@ export default function MapScreen() {
         return;
       }
 
-      // For commute mode, use the selected suggestion's distance
       let tripDistance = parseFloat(routeInfo.distanceKm);
       if (mode === 'commute' && commuteSuggestions.length > 0) {
         const selectedRoute = commuteSuggestions[selectedSuggestion];
@@ -340,178 +336,155 @@ export default function MapScreen() {
         showsMyLocationButton={false}
         showsCompass={false}>
         {stationMarkers}
-        {/* Draw route polylines - separate line for each step with geometry */}
         {mode === 'commute' && commuteSuggestions.length > 0 && commuteSuggestions[selectedSuggestion]?.steps.map((step: any, idx: number) => {
           const coords = step.coordinates || [];
           return coords.length > 1 ? (
             <Polyline key={`step-${idx}`} coordinates={coords} strokeColor={step.color} strokeWidth={4} />
           ) : null;
         })}
-        {/* Single polyline for non-commute modes */}
         {mode !== 'commute' && routeCoords.length > 1 && (
           <Polyline coordinates={routeCoords} strokeColor={EV.primary} strokeWidth={4} />
         )}
       </MapView>
 
-      {/* Floating back button + route info strip when viewing route */}
-      {routeActive && (
-        <TouchableOpacity style={styles.routeBackBtn} onPress={resetRoute}>
-          <Ionicons name="arrow-back" size={20} color={EV.text} />
-          <Text style={styles.routeBackText}>Back</Text>
-        </TouchableOpacity>
-      )}
-
+      {/* Dynamic Island Style Route Bar */}
       {routeActive && routeInfo && (
-        <View style={styles.routeFloatingBar}>
-          <View style={styles.routeFloatItem}>
-            <Ionicons name="navigate" size={13} color={EV.primary} />
-            <Text style={styles.routeFloatVal}>{routeInfo.distanceKm} km</Text>
+        <View style={styles.dynamicIsland}>
+          <TouchableOpacity onPress={resetRoute} style={styles.dynamicBackBtn}>
+            <Ionicons name="arrow-back" size={16} color={EV.text} />
+          </TouchableOpacity>
+          
+          <View style={styles.dynamicInfo}>
+            <View style={styles.dynamicInfoItem}>
+              <Ionicons name="navigate" size={11} color={EV.primary} />
+              <Text style={styles.dynamicInfoVal}>{routeInfo.distanceKm} km</Text>
+            </View>
+            <View style={styles.dynamicDot} />
+            <View style={styles.dynamicInfoItem}>
+              <Ionicons name="time-outline" size={11} color={EV.accent} />
+              <Text style={styles.dynamicInfoVal}>{routeInfo.durationMin} min</Text>
+            </View>
           </View>
-          <View style={styles.routeFloatDivider} />
-          <View style={styles.routeFloatItem}>
-            <Ionicons name="time-outline" size={13} color={EV.accent} />
-            <Text style={styles.routeFloatVal}>{routeInfo.durationMin} min</Text>
-          </View>
-          <View style={styles.routeFloatDivider} />
-          <TouchableOpacity style={styles.routeFloatSave} onPress={handleSaveTrip} disabled={savingTrip}>
-            {savingTrip
-              ? <ActivityIndicator size="small" color={EV.bg} />
-              : <><Ionicons name="leaf" size={13} color={EV.bg} /><Text style={styles.routeFloatSaveText}>Save</Text></>
-            }
+          
+          <TouchableOpacity 
+            style={styles.dynamicSaveBtn} 
+            onPress={handleSaveTrip} 
+            disabled={savingTrip}
+          >
+            {savingTrip ? (
+              <ActivityIndicator size="small" color={EV.bg} />
+            ) : (
+              <>
+                <Ionicons name="leaf" size={12} color={EV.bg} />
+                <Text style={styles.dynamicSaveText}>Save</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       )}
 
       {/* Search overlay */}
       <SafeAreaView edges={['top']} style={styles.safeTop}>
-        {/* App header — hidden when viewing route */}
         {!routeActive && (
-          <>
-            
-            <View style={styles.searchPanel}>
-          {/* Place A */}
-          <View style={styles.inputRow}>
-            <View style={styles.dotA}><View style={styles.dotAInner} /></View>
-            <TextInput
-              style={styles.searchText}
-              placeholder="Origin"
-              placeholderTextColor={EV.textDim}
-              value={origin}
-              onChangeText={handleOriginChange}
-              onFocus={() => setActiveField('origin')}
-            />
-            <TouchableOpacity onPress={useCurrentLocation}>
-              <Ionicons name="locate" size={16} color={EV.primary} />
-            </TouchableOpacity>
-          </View>
+          <View style={styles.searchPanel}>
+            {/* Place A */}
+            <View style={styles.inputRow}>
+              <View style={styles.dotA}><View style={styles.dotAInner} /></View>
+              <TextInput
+                style={styles.searchText}
+                placeholder="Origin"
+                placeholderTextColor={EV.textDim}
+                value={origin}
+                onChangeText={handleOriginChange}
+                onFocus={() => setActiveField('origin')}
+              />
+              <TouchableOpacity onPress={useCurrentLocation}>
+                <Ionicons name="locate" size={16} color={EV.primary} />
+              </TouchableOpacity>
+            </View>
 
-          {originSuggestions.length > 0 && activeField === 'origin' && (
-            <View style={styles.suggestionsBox}>
-              {originSuggestions.map((s, i) => (
-                <TouchableOpacity key={i} style={[styles.suggestionItem, i < originSuggestions.length - 1 && styles.suggestionBorder]}
-                  onPress={() => {
-                    const coords = { latitude: s.latitude, longitude: s.longitude };
-                    setOrigin(s.label);
-                    setOriginCoords(coords);
-                    setOriginSuggestions([]);
-                    loadNearbyStations(coords);
-                  }}>
-                  <Ionicons name="location-outline" size={13} color={EV.primary} />
-                  <Text style={styles.suggestionText} numberOfLines={1}>{s.label}</Text>
+            {originSuggestions.length > 0 && activeField === 'origin' && (
+              <View style={styles.suggestionsBox}>
+                {originSuggestions.map((s, i) => (
+                  <TouchableOpacity key={i} style={[styles.suggestionItem, i < originSuggestions.length - 1 && styles.suggestionBorder]}
+                    onPress={() => {
+                      const coords = { latitude: s.latitude, longitude: s.longitude };
+                      setOrigin(s.label);
+                      setOriginCoords(coords);
+                      setOriginSuggestions([]);
+                      loadNearbyStations(coords);
+                    }}>
+                    <Ionicons name="location-outline" size={13} color={EV.primary} />
+                    <Text style={styles.suggestionText} numberOfLines={1}>{s.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            <View style={styles.dividerLine} />
+
+            {/* Place B */}
+            <View style={styles.inputRow}>
+              <View style={styles.dotB} />
+              <TextInput
+                style={styles.searchText}
+                placeholder="Set Location"
+                placeholderTextColor={EV.textDim}
+                value={destination}
+                onChangeText={handleDestChange}
+                onFocus={() => setActiveField('dest')}
+              />
+              {(origin || destination) && (
+                <TouchableOpacity onPress={() => { setOrigin(''); setDestination(''); setOriginCoords(null); setDestCoords(null); setRouteActive(false); setRouteCoords([]); setRouteInfo(null); setNearbyOriginStations([]); }}>
+                  <Ionicons name="close-circle" size={16} color={EV.textDim} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {destSuggestions.length > 0 && activeField === 'dest' && (
+              <View style={styles.suggestionsBox}>
+                {destSuggestions.map((s, i) => (
+                  <TouchableOpacity key={i} style={[styles.suggestionItem, i < destSuggestions.length - 1 && styles.suggestionBorder]}
+                    onPress={() => { setDestination(s.label); setDestCoords({ latitude: s.latitude, longitude: s.longitude }); setDestSuggestions([]); }}>
+                    <Ionicons name="location-outline" size={13} color={EV.danger} />
+                    <Text style={styles.suggestionText} numberOfLines={1}>{s.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Mode selector */}
+            <View style={styles.modeRow}>
+              {MODES.map(m => (
+                <TouchableOpacity key={m.key} style={[styles.modeBtn, mode === m.key && styles.modeBtnActive]} onPress={() => {
+                  setMode(m.key);
+                  setCommuteSuggestions([]);
+                  setRouteCoords([]);
+                  setRouteInfo(null);
+                  setRouteActive(false);
+                }}>
+                  <Ionicons name={m.icon as any} size={16} color={mode === m.key ? EV.bg : EV.textMuted} />
+                  <Text style={[styles.modeLabel, mode === m.key && styles.modeLabelActive]}>{m.label}</Text>
                 </TouchableOpacity>
               ))}
-            </View>
-          )}
-
-          <View style={styles.dividerLine} />
-
-          {/* Place B */}
-          <View style={styles.inputRow}>
-            <View style={styles.dotB} />
-            <TextInput
-              style={styles.searchText}
-              placeholder="Set Location"
-              placeholderTextColor={EV.textDim}
-              value={destination}
-              onChangeText={handleDestChange}
-              onFocus={() => setActiveField('dest')}
-            />
-            {(origin || destination) && (
-              <TouchableOpacity onPress={() => { setOrigin(''); setDestination(''); setOriginCoords(null); setDestCoords(null); setRouteActive(false); setRouteCoords([]); setRouteInfo(null); setNearbyOriginStations([]); }}>
-                <Ionicons name="close-circle" size={16} color={EV.textDim} />
+              <TouchableOpacity
+                style={[styles.goBtn, (!originCoords || !destCoords) && styles.goBtnDisabled]}
+                onPress={handleCalculateRoute}
+                disabled={!originCoords || !destCoords || routeLoading}>
+                {routeLoading
+                  ? <ActivityIndicator size="small" color={EV.bg} />
+                  : <Ionicons name="arrow-forward" size={18} color={EV.bg} />}
               </TouchableOpacity>
+            </View>
+
+            {commuteSuggestions.length > 0 && (
+              <View style={styles.routeBar}>
+                <Ionicons name="bus" size={13} color={EV.info} />
+                <Text style={styles.routeVal}>{commuteSuggestions.length} route{commuteSuggestions.length > 1 ? 's' : ''} found</Text>
+                <Text style={styles.routeVal}>· {routeInfo?.distanceKm} km</Text>
+              </View>
             )}
           </View>
-
-          {destSuggestions.length > 0 && activeField === 'dest' && (
-            <View style={styles.suggestionsBox}>
-              {destSuggestions.map((s, i) => (
-                <TouchableOpacity key={i} style={[styles.suggestionItem, i < destSuggestions.length - 1 && styles.suggestionBorder]}
-                  onPress={() => { setDestination(s.label); setDestCoords({ latitude: s.latitude, longitude: s.longitude }); setDestSuggestions([]); }}>
-                  <Ionicons name="location-outline" size={13} color={EV.danger} />
-                  <Text style={styles.suggestionText} numberOfLines={1}>{s.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {/* Mode selector */}
-          <View style={styles.modeRow}>
-            {MODES.map(m => (
-              <TouchableOpacity key={m.key} style={[styles.modeBtn, mode === m.key && styles.modeBtnActive]} onPress={() => {
-                setMode(m.key);
-                setCommuteSuggestions([]);
-                setRouteCoords([]);
-                setRouteInfo(null);
-                setRouteActive(false);
-              }}>
-                <Ionicons name={m.icon as any} size={16} color={mode === m.key ? EV.bg : EV.textMuted} />
-                <Text style={[styles.modeLabel, mode === m.key && styles.modeLabelActive]}>{m.label}</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={[styles.goBtn, (!originCoords || !destCoords) && styles.goBtnDisabled]}
-              onPress={handleCalculateRoute}
-              disabled={!originCoords || !destCoords || routeLoading}>
-              {routeLoading
-                ? <ActivityIndicator size="small" color={EV.bg} />
-                : <Ionicons name="arrow-forward" size={18} color={EV.bg} />}
-            </TouchableOpacity>
-          </View>
-
-          {routeActive && routeInfo && (
-            <View style={styles.routeBar}>
-              <View style={styles.routeItem}><Ionicons name="navigate" size={13} color={EV.primary} /><Text style={styles.routeVal}>{routeInfo.distanceKm} km</Text></View>
-              <View style={styles.routeDivider} />
-              <View style={styles.routeItem}><Ionicons name="time-outline" size={13} color={EV.accent} /><Text style={styles.routeVal}>{routeInfo.durationMin} min</Text></View>
-              <TouchableOpacity style={{ marginLeft: 'auto' as any }} onPress={() => { setRouteActive(false); setRouteCoords([]); setRouteInfo(null); setCommuteSteps([]); }}>
-                <Ionicons name="close" size={14} color={EV.textMuted} />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {routeActive && routeInfo && (
-            <TouchableOpacity style={styles.saveTripBtn} onPress={handleSaveTrip} disabled={savingTrip}>
-              {savingTrip ? (
-                <ActivityIndicator size="small" color={EV.bg} />
-              ) : (
-                <>
-                  <Ionicons name="leaf" size={16} color={EV.bg} />
-                  <Text style={styles.saveTripText}>Save Trip & View Carbon</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
-
-          {commuteSuggestions.length > 0 && (
-            <View style={styles.routeBar}>
-              <Ionicons name="bus" size={13} color={EV.info} />
-              <Text style={styles.routeVal}>{commuteSuggestions.length} route{commuteSuggestions.length > 1 ? 's' : ''} found</Text>
-              <Text style={styles.routeVal}>· {routeInfo?.distanceKm} km</Text>
-            </View>
-          )}
-        </View>
-          </>
         )}
       </SafeAreaView>
 
@@ -520,15 +493,11 @@ export default function MapScreen() {
         <TouchableOpacity style={styles.mapBtn} onPress={locateMe}>
           <Ionicons name="locate" size={20} color={EV.primary} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.mapBtn}>
-          <Ionicons name="layers-outline" size={20} color={EV.textMuted} />
-        </TouchableOpacity>
+        
       </Animated.View>
 
       {/* Bottom sheet */}
       <Animated.View style={[styles.sheet, { height: sheetAnim }]}>
-
-        {/* Drag handle */}
         <View {...panResponder.panHandlers} style={styles.sheetHeader}>
           <Animated.View style={[styles.handleBar, { transform: [{ scaleX: handleScale }] }]} />
           <View style={styles.peekRow}>
@@ -542,7 +511,6 @@ export default function MapScreen() {
           </View>
         </View>
 
-        {/* Selected station */}
         {selectedS ? (
           <View style={styles.selectedDetail}>
             <View style={styles.selectedTop}>
@@ -660,7 +628,7 @@ export default function MapScreen() {
                 {stationsLoading && <ActivityIndicator size="small" color={EV.primary} style={{ marginLeft: 6 }} />}
               </View>
             )}
-            <ScrollView  showsVerticalScrollIndicator={false} contentContainerStyle={styles.stationList}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.stationList}>
               {(nearbyOriginStations.length > 0 ? nearbyOriginStations : STATIONS).map((s, index) => (
                 <TouchableOpacity key={`sheet-${s.id}-${index}`} style={styles.stationCard} onPress={() => handleStationPress(s.id)} activeOpacity={0.85}>
                   <View style={styles.stationCardTop}>
@@ -692,32 +660,13 @@ export default function MapScreen() {
   );
 }
 
-const darkMapStyle = [
-  { elementType: 'geometry', stylers: [{ color: '#0a1a0f' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#6DBF8A' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#050F0A' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#0D2B1A' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1A4A2A' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#112E1C' }] },
-  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#00C853' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#030a06' }] },
-  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#0A1F14' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#0d2b1a' }] },
-  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#0A1F14' }] },
-  { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#1A4A2A' }] },
-  { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#071409' }] },
-];
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: EV.bg },
   safeTop: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
 
-  appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 8, marginTop: 4 },
-  appHeaderLogo: { width: 36, height: 36, borderRadius: 10, shadowColor: '#a1a1a1', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
-  appHeaderTitle: { fontSize: 18, fontWeight: '800', color: EV.text },
-
   searchPanel: {
     marginHorizontal: 12,
+    marginTop: 8,
     backgroundColor: EV.bgCard + 'F8',
     borderRadius: 18,
     paddingHorizontal: 14,
@@ -749,66 +698,70 @@ const styles = StyleSheet.create({
   routeVal: { fontSize: 12, fontWeight: '700', color: EV.text },
   routeDivider: { width: 1, height: 14, backgroundColor: EV.border },
 
-  saveTripBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: EV.primary, borderRadius: 12, paddingVertical: 12,
-    marginTop: 8,
-  },
-  saveTripText: { color: EV.bg, fontSize: 13, fontWeight: '800' },
-
-  routeBackBtn: {
+  // Dynamic Island Style Route Bar
+  dynamicIsland: {
     position: 'absolute',
-    top: 56,
-    left: 16,
+    top: 50,
+    left: '50%',
+    transform: [{ translateX: -135 }],
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: EV.bgCard + 'F2',
+    borderRadius: 40,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 0.5,
+    borderColor: EV.primary + '60',
+    zIndex: 20,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  dynamicBackBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 20,
+    backgroundColor: EV.bgSurface,
+  },
+  dynamicInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: EV.bgCard + 'F0',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: EV.border,
-    zIndex: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 6,
+    paddingHorizontal: 4,
   },
-  routeBackText: { color: EV.text, fontSize: 13, fontWeight: '700' },
-
-  routeFloatingBar: {
-    position: 'absolute',
-    top: 56,
-    left: 100,
-    right: 16,
+  dynamicInfoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: EV.bgCard + 'F0',
-    borderRadius: 12,
+    gap: 4,
+  },
+  dynamicInfoVal: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: EV.text,
+  },
+  dynamicDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: EV.textDim,
+  },
+  dynamicSaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: EV.primary,
+    borderRadius: 30,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: EV.border,
-    zIndex: 15,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 6,
+    paddingVertical: 5,
   },
-  routeFloatItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  routeFloatDivider: { width: 1, height: 14, backgroundColor: EV.border },
-  routeFloatVal: { fontSize: 12, fontWeight: '700', color: EV.text },
-  routeFloatSave: {
-    marginLeft: 'auto' as any,
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: EV.primary, borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 5,
+  dynamicSaveText: {
+    color: EV.bg,
+    fontSize: 11,
+    fontWeight: '700',
   },
-  routeFloatSaveText: { color: EV.bg, fontSize: 11, fontWeight: '800' },
 
   mapControls: { position: 'absolute', right: 16, gap: 10, zIndex: 5 },
   mapBtn: {
@@ -877,7 +830,6 @@ const styles = StyleSheet.create({
     width: 30, height: 30, borderRadius: 8,
     backgroundColor: EV.primary, alignItems: 'center', justifyContent: 'center',
   },
-  cardNavBtnText: { fontSize: 12, fontWeight: '700', color: EV.bg },
 
   selectedDetail: { flex: 1, paddingHorizontal: 16 },
   selectedTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
@@ -920,19 +872,6 @@ const styles = StyleSheet.create({
   suggestionBorder: { borderBottomWidth: 1, borderBottomColor: EV.border },
   suggestionText: { flex: 1, color: EV.text, fontSize: 13 },
 
-  commuteSteps: { marginTop: 6, backgroundColor: EV.bgSurface, borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: EV.border },
-  commuteStep: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 8, borderBottomWidth: 1, borderBottomColor: EV.border },
-  stepDot: { width: 8, height: 8, borderRadius: 4 },
-  stepInfo: { flex: 1 },
-  stepLabel: { color: EV.text, fontSize: 11, fontWeight: '700' },
-  stepDetail: { color: EV.textMuted, fontSize: 10, marginTop: 1 },
-  commuteSuggestion: { backgroundColor: EV.bgSurface, borderRadius: 10, borderWidth: 1, borderColor: EV.border, marginTop: 6, overflow: 'hidden' },
-  suggestionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 8, borderBottomWidth: 1, borderBottomColor: EV.border },
-  suggestionBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  suggestionBadgeText: { color: EV.bg, fontSize: 10, fontWeight: '800' },
-  suggestionDuration: { color: EV.text, fontSize: 11, fontWeight: '700', flex: 1 },
-  suggestionFare: { color: EV.primary, fontSize: 11, fontWeight: '800' },
-
   suggestionTabs: { flexDirection: 'row', gap: 8, paddingBottom: 10 },
   suggestionTab: {
     alignItems: 'center', justifyContent: 'center',
@@ -955,8 +894,6 @@ const styles = StyleSheet.create({
   journeyBadgeText: { color: EV.bg, fontSize: 11, fontWeight: '800' },
   journeyDuration: { color: EV.text, fontSize: 15, fontWeight: '800' },
   journeyFare: { color: EV.textMuted, fontSize: 11, marginTop: 2 },
-  selectedBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1 },
-  selectedBadgeText: { fontSize: 10, fontWeight: '700' },
 
   timeline: { padding: 14, gap: 0 },
   timelineRow: { flexDirection: 'row', gap: 12, minHeight: 52 },

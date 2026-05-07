@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, StatusBar, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { EV } from '@/constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserExpenses, getIncomes, getTrips, deleteTrip } from '@/services/api';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 
 const EXPENSE_CATEGORIES = [
   { key: 'charging', label: 'Charging', icon: 'flash', color: EV.primary },
@@ -49,11 +49,7 @@ export default function HomeScreen() {
     loadData();
   }, []);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      loadData();
-    }, [])
-  );
+  
 
   const loadData = async () => {
     setLoading(true);
@@ -118,6 +114,11 @@ export default function HomeScreen() {
   const isOverBudget = balance < 0;
   const isLowBalance = totalIncome > 0 && balance < totalIncome * 0.2 && balance > 0;
   const balanceColor = isOverBudget ? EV.danger : isLowBalance ? EV.warning : EV.primary;
+  const recentTransactions = useMemo(() => {
+    return [...incomes.slice(0, 3), ...expenses.slice(0, 3)]
+      .sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime())
+      .slice(0, 5);
+  }, [incomes, expenses]);
 
   if (loading) {
     return (
@@ -210,9 +211,7 @@ export default function HomeScreen() {
               <Text style={styles.seeAll}>See All</Text>
             </TouchableOpacity>
           </View>
-          {[...incomes.slice(0, 3), ...expenses.slice(0, 3)]
-            .sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime())
-            .slice(0, 5)
+          {recentTransactions
             .map((item) => {
               const isIncome = 'date' in item;
               const cat = isIncome

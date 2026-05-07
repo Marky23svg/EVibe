@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, StatusBar, ActivityIndicator, Image,
+  ScrollView, StatusBar, ActivityIndicator, Image, FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -59,7 +59,132 @@ export default function StationsScreen() {
     }
   };
 
-  const filtered = filter === 'All' ? stations : stations.filter(s => s.type.includes(filter));
+  const filtered = useMemo(
+    () => (filter === 'All' ? stations : stations.filter(s => s.type.includes(filter))),
+    [filter, stations]
+  );
+
+  const renderStationItem = useCallback(({ item: station }: { item: any }) => {
+    const isExpanded = expanded === station.id;
+    const isFast = station.type === 'DC Fast';
+    return (
+      <TouchableOpacity
+        key={station.id}
+        style={[styles.card, isExpanded && styles.cardExpanded]}
+        onPress={() => setExpanded(isExpanded ? null : station.id)}
+        activeOpacity={0.85}>
+
+      {/* Distance badge */}
+      <View style={styles.distanceBadge}>
+        <Text style={styles.distanceBadgeText}>{station.distance}</Text>
+      </View>
+
+      <View style={styles.cardMain}>
+        {/* Icon */}
+        <View style={[styles.iconWrap, isFast && styles.iconWrapFast]}>
+          <Ionicons name="flash" size={22} color={EV.bg} />
+          {isFast && <View style={styles.fastGlow} />}
+        </View>
+
+        {/* Info */}
+        <View style={styles.cardInfo}>
+          <Text style={styles.stationName}>{station.name}</Text>
+          <View style={styles.addressRow}>
+            <Ionicons name="location-outline" size={11} color={EV.textDim} />
+            <Text style={styles.stationAddr}>{station.address}</Text>
+          </View>
+
+          <View style={styles.tagsRow}>
+            <View style={[styles.typeTag, isFast && styles.typeTagFast]}>
+              <Text style={[styles.typeTagText, isFast && styles.typeTagTextFast]}>{station.type}</Text>
+            </View>
+            <View style={styles.powerTag}>
+              <Text style={styles.powerTagText}>{station.power}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Availability */}
+      <View style={styles.availRow}>
+        <View style={styles.availLeft}>
+          <Text style={styles.availLabel}>Availability</Text>
+          <AvailabilityBar available={station.available} total={station.total} />
+        </View>
+        <View style={styles.availRight}>
+          <Text style={styles.availCount}>
+            <Text style={{ color: station.available > 0 ? EV.primary : EV.danger }}>
+              {station.available}
+            </Text>
+            /{station.total}
+          </Text>
+          <Text style={styles.availSub}>open</Text>
+        </View>
+      </View>
+
+      {/* Expanded */}
+      {isExpanded && (
+        <View style={styles.expandedContent}>
+          <View style={styles.expandedDivider} />
+
+          <View style={styles.detailsGrid}>
+            <View style={styles.detailBox}>
+              <View style={[styles.detailIcon, { backgroundColor: EV.primary + '20' }]}>
+                <Ionicons name="cash-outline" size={16} color={EV.primary} />
+              </View>
+              <Text style={styles.detailVal}>{station.cost}</Text>
+              <Text style={styles.detailLbl}>Cost</Text>
+            </View>
+            <View style={styles.detailBox}>
+              <View style={[styles.detailIcon, { backgroundColor: EV.accent + '20' }]}>
+                <Ionicons name="time-outline" size={16} color={EV.accent} />
+              </View>
+              <Text style={styles.detailVal}>{station.time}</Text>
+              <Text style={styles.detailLbl}>Charge Time</Text>
+            </View>
+            <View style={styles.detailBox}>
+              <View style={[styles.detailIcon, { backgroundColor: EV.info + '20' }]}>
+                <Ionicons name="hardware-chip-outline" size={16} color={EV.info} />
+              </View>
+              <Text style={styles.detailVal}>{station.connectors?.[0] || 'N/A'}</Text>
+              <Text style={styles.detailLbl}>Connector</Text>
+            </View>
+          </View>
+
+          {station.connectors && station.connectors.length > 1 && (
+            <View style={styles.connectorRow}>
+              {station.connectors.map((c: string, idx: number) => (
+                <View key={`${c}-${idx}`} style={styles.connectorChip}>
+                  <Text style={styles.connectorChipText}>{c}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.dirBtn}>
+              <Ionicons name="navigate-outline" size={14} color={EV.primary} />
+              <Text style={styles.dirBtnText}>Directions</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.addTripBtn}>
+              <Ionicons name="add-circle" size={14} color={EV.bg} />
+              <Text style={styles.addTripBtnText}>Add to Trip</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Expand indicator */}
+      <View style={styles.expandIndicator}>
+        <Ionicons
+          name={isExpanded ? 'chevron-up' : 'chevron-down'}
+          size={14}
+          color={EV.textDim}
+        />
+      </View>
+    </TouchableOpacity>
+    );
+  }, [expanded]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -99,141 +224,30 @@ export default function StationsScreen() {
         ))}
       </ScrollView>
 
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        {loading ? (
-          <View style={{ padding: 40, alignItems: 'center' }}>
-            <ActivityIndicator size="large" color={EV.primary} />
-            <Text style={{ color: EV.textMuted, marginTop: 12 }}>Finding stations near you...</Text>
-          </View>
-        ) : filtered.length === 0 ? (
-          <View style={{ padding: 40, alignItems: 'center' }}>
-            <Text style={{ color: EV.textMuted }}>No stations found nearby</Text>
-          </View>
-        ) : (
-          filtered.map((station) => {
-            const isExpanded = expanded === station.id;
-            const isFast = station.type === 'DC Fast';
-            return (
-              <TouchableOpacity
-                key={station.id}
-                style={[styles.card, isExpanded && styles.cardExpanded]}
-                onPress={() => setExpanded(isExpanded ? null : station.id)}
-                activeOpacity={0.85}>
-
-              {/* Distance badge */}
-              <View style={styles.distanceBadge}>
-                <Text style={styles.distanceBadgeText}>{station.distance}</Text>
-              </View>
-
-              <View style={styles.cardMain}>
-                {/* Icon */}
-                <View style={[styles.iconWrap, isFast && styles.iconWrapFast]}>
-                  <Ionicons name="flash" size={22} color={EV.bg} />
-                  {isFast && <View style={styles.fastGlow} />}
-                </View>
-
-                {/* Info */}
-                <View style={styles.cardInfo}>
-                  <Text style={styles.stationName}>{station.name}</Text>
-                  <View style={styles.addressRow}>
-                    <Ionicons name="location-outline" size={11} color={EV.textDim} />
-                    <Text style={styles.stationAddr}>{station.address}</Text>
-                  </View>
-
-                  <View style={styles.tagsRow}>
-                    <View style={[styles.typeTag, isFast && styles.typeTagFast]}>
-                      <Text style={[styles.typeTagText, isFast && styles.typeTagTextFast]}>{station.type}</Text>
-                    </View>
-                    <View style={styles.powerTag}>
-                      <Text style={styles.powerTagText}>{station.power}</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/* Availability */}
-              <View style={styles.availRow}>
-                <View style={styles.availLeft}>
-                  <Text style={styles.availLabel}>Availability</Text>
-                  <AvailabilityBar available={station.available} total={station.total} />
-                </View>
-                <View style={styles.availRight}>
-                  <Text style={styles.availCount}>
-                    <Text style={{ color: station.available > 0 ? EV.primary : EV.danger }}>
-                      {station.available}
-                    </Text>
-                    /{station.total}
-                  </Text>
-                  <Text style={styles.availSub}>open</Text>
-                </View>
-              </View>
-
-              {/* Expanded */}
-              {isExpanded && (
-                <View style={styles.expandedContent}>
-                  <View style={styles.expandedDivider} />
-
-                  <View style={styles.detailsGrid}>
-                    <View style={styles.detailBox}>
-                      <View style={[styles.detailIcon, { backgroundColor: EV.primary + '20' }]}>
-                        <Ionicons name="cash-outline" size={16} color={EV.primary} />
-                      </View>
-                      <Text style={styles.detailVal}>{station.cost}</Text>
-                      <Text style={styles.detailLbl}>Cost</Text>
-                    </View>
-                    <View style={styles.detailBox}>
-                      <View style={[styles.detailIcon, { backgroundColor: EV.accent + '20' }]}>
-                        <Ionicons name="time-outline" size={16} color={EV.accent} />
-                      </View>
-                      <Text style={styles.detailVal}>{station.time}</Text>
-                      <Text style={styles.detailLbl}>Charge Time</Text>
-                    </View>
-                    <View style={styles.detailBox}>
-                      <View style={[styles.detailIcon, { backgroundColor: EV.info + '20' }]}>
-                        <Ionicons name="hardware-chip-outline" size={16} color={EV.info} />
-                      </View>
-                      <Text style={styles.detailVal}>{station.connectors?.[0] || 'N/A'}</Text>
-                      <Text style={styles.detailLbl}>Connector</Text>
-                    </View>
-                  </View>
-
-                  {station.connectors && station.connectors.length > 1 && (
-                    <View style={styles.connectorRow}>
-                      {station.connectors.map((c: string, idx: number) => (
-                        <View key={`${c}-${idx}`} style={styles.connectorChip}>
-                          <Text style={styles.connectorChipText}>{c}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity style={styles.dirBtn}>
-                      <Ionicons name="navigate-outline" size={14} color={EV.primary} />
-                      <Text style={styles.dirBtnText}>Directions</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.addTripBtn}>
-                      <Ionicons name="add-circle" size={14} color={EV.bg} />
-                      <Text style={styles.addTripBtnText}>Add to Trip</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
-              {/* Expand indicator */}
-              <View style={styles.expandIndicator}>
-                <Ionicons
-                  name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                  size={14}
-                  color={EV.textDim}
-                />
-              </View>
-            </TouchableOpacity>
-            );
-          })
-        )}
-        <View style={{ height: 24 }} />
-      </ScrollView>
+      <FlatList
+        style={styles.scroll}
+        data={filtered}
+        keyExtractor={(item) => item.id}
+        renderItem={renderStationItem}
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={7}
+        removeClippedSubviews
+        ListEmptyComponent={
+          loading ? (
+            <View style={{ padding: 40, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={EV.primary} />
+              <Text style={{ color: EV.textMuted, marginTop: 12 }}>Finding stations near you...</Text>
+            </View>
+          ) : (
+            <View style={{ padding: 40, alignItems: 'center' }}>
+              <Text style={{ color: EV.textMuted }}>No stations found nearby</Text>
+            </View>
+          )
+        }
+        ListFooterComponent={<View style={{ height: 24 }} />}
+      />
     </SafeAreaView>
   );
 }

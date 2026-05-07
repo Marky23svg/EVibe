@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, StatusBar, ActivityIndicator, TouchableOpacity, Alert, Image,
 } from 'react-native';
@@ -69,20 +69,15 @@ function getMessage(score: number) {
 
 export default function EcoScreen() {
   const router = useRouter();
-  const { loading: carbonLoading, error, carbonData, refetch } = useCarbonData();
+  const { loading: carbonLoading, carbonData } = useCarbonData();
   const [loading, setLoading] = useState(true);
   const [scores, setScores] = useState({ overall: 0, carbon: 0, budget: 0, efficiency: 0 });
   const [tripHistory, setTripHistory] = useState<any[]>([]);
   const [tripInfo, setTripInfo] = useState<any>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
   useFocusEffect(
     React.useCallback(() => {
       loadData();
-      refetch();
     }, [])
   );
 
@@ -156,16 +151,11 @@ export default function EcoScreen() {
   const saved = carbonData?.savedKg || 0;
   const treesSaved = carbonData?.treesEquivalent || 0;
   const reductionPct = carbonData?.savedPercentage || 0;
-  const evCO2 = carbonData?.tripEmission || 0;
-  const gasCO2 = carbonData?.carEmission || 0;
-  const distanceKm = carbonData?.distanceKm || 0;
-  const energyKwh = carbonData?.energyKwh || 0;
-
-  const metrics = [
+  const metrics = useMemo(() => [
     { label: 'Budget Score', value: budget, icon: 'wallet-outline', color: EV.accent, desc: 'Stayed within budget' },
     { label: 'Carbon Score', value: carbon, icon: 'leaf-outline', color: EV.primary, desc: 'Low emissions trip' },
     { label: 'Efficiency', value: efficiency, icon: 'flash-outline', color: EV.neon, desc: 'Energy usage rating' },
-  ];
+  ], [budget, carbon, efficiency]);
 
   if (loading || carbonLoading) {
     return (

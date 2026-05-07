@@ -1,13 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Dimensions, Alert, ActivityIndicator, RefreshControl, Image } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, Alert, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { EV } from '@/constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserExpenses, getIncomes, getMonthlySummary, getYearlySummary, getDailySummary, deleteExpense as apiDeleteExpense, deleteIncome as apiDeleteIncome } from '@/services/api';
 import { useRouter, useFocusEffect } from 'expo-router';
-
-const { width } = Dimensions.get('window');
 
 const EXPENSE_CATEGORIES = [
   { key: 'charging', label: 'Charging', icon: 'flash', color: EV.primary },
@@ -37,6 +35,32 @@ export default function BudgetScreen() {
   const [monthlyData, setMonthlyData] = useState<any>(null);
   const [yearlyData, setYearlyData] = useState<any>(null);
   const [noUser, setNoUser] = useState(false);
+  const selectedYear = selectedDate.getFullYear();
+  const selectedMonth = selectedDate.getMonth();
+
+  const monthlyCumulativeMap = useMemo(() => {
+    const dailyMap = monthlyData?.dailyMap || {};
+    const daysInSelectedMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+    const cumulativeMap: Record<number, { income: number; expenses: number; cumulativeExpenses: number; balance: number }> = {};
+    let cumulativeIncome = 0;
+    let cumulativeExpenses = 0;
+
+    for (let day = 1; day <= daysInSelectedMonth; day++) {
+      const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dayData = dailyMap[dateStr] || { income: 0, expenses: 0 };
+      if (dayData.income > 0) cumulativeIncome += dayData.income;
+      if (dayData.expenses > 0) cumulativeExpenses += dayData.expenses;
+
+      cumulativeMap[day] = {
+        income: cumulativeIncome,
+        expenses: dayData.expenses || 0,
+        cumulativeExpenses,
+        balance: cumulativeIncome - cumulativeExpenses,
+      };
+    }
+
+    return cumulativeMap;
+  }, [monthlyData, selectedYear, selectedMonth]);
 
   useEffect(() => {
     loadData();
@@ -93,29 +117,16 @@ export default function BudgetScreen() {
       const dateStr = `${year}-${month}-${day}`;
       const res = await getDailySummary(userId, dateStr);
       
-      // Calculate cumulative income up to selected day
-      let cumulativeIncome = 0;
-      let cumulativeExpenses = 0;
       const selectedDay = date.getDate();
-      const selectedMonth = date.getMonth();
-      const selectedYear = date.getFullYear();
-      
-      for (let d = 1; d <= selectedDay; d++) {
-        const dStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        const dData = monthlyData?.dailyMap?.[dStr];
-        if (dData) {
-          if (dData.income > 0) cumulativeIncome += dData.income;
-          if (dData.expenses > 0) cumulativeExpenses += dData.expenses;
-        }
-      }
+      const cumulativeData = monthlyCumulativeMap[selectedDay] || { income: 0, cumulativeExpenses: 0 };
       
       // Update daily data with cumulative values
       const updatedData = {
         ...res.data,
-        totalIncome: cumulativeIncome,
+        totalIncome: cumulativeData.income,
         totalExpenses: res.data.totalExpenses || 0, // Only today's expenses, 0 if none
-        cumulativeExpenses: cumulativeExpenses, // Total expenses up to this day
-        balance: cumulativeIncome - cumulativeExpenses,
+        cumulativeExpenses: cumulativeData.cumulativeExpenses, // Total expenses up to this day
+        balance: cumulativeData.income - cumulativeData.cumulativeExpenses,
       };
       
       setDailyData(updatedData);
@@ -251,8 +262,8 @@ export default function BudgetScreen() {
   );
 
   const renderCalendar = () => {
-    const year = selectedDate.getFullYear();
-    const month = selectedDate.getMonth();
+    const year = selectedYear;
+    const month = selectedMonth;
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const today = new Date();
@@ -262,37 +273,9 @@ export default function BudgetScreen() {
     for (let i = 0; i < firstDay; i++) days.push(null);
     for (let i = 1; i <= daysInMonth; i++) days.push(i);
 
-    const getDayData = (day: number) => {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const dayData = monthlyData?.dailyMap?.[dateStr] || { income: 0, expenses: 0 };
-      
-      // Calculate cumulative income up to this day
-      let cumulativeIncome = 0;
-      for (let d = 1; d <= day; d++) {
-        const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        const dData = monthlyData?.dailyMap?.[dStr];
-        if (dData && dData.income > 0) {
-          cumulativeIncome += dData.income;
-        }
-      }
-      
-      // Calculate cumulative expenses up to this day
-      let cumulativeExpenses = 0;
-      for (let d = 1; d <= day; d++) {
-        const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        const dData = monthlyData?.dailyMap?.[dStr];
-        if (dData && dData.expenses > 0) {
-          cumulativeExpenses += dData.expenses;
-        }
-      }
-      
-      return { 
-        income: cumulativeIncome, 
-        expenses: dayData.expenses, // Only show expenses on the day they occurred
-        cumulativeExpenses: cumulativeExpenses,
-        balance: cumulativeIncome - cumulativeExpenses
-      };
-    };
+    const getDayData = (day: number) => (
+      monthlyCumulativeMap[day] || { income: 0, expenses: 0, cumulativeExpenses: 0, balance: 0 }
+    );
 
     const isToday = (day: number) => {
       return isCurrentMonth && day === today.getDate();
@@ -368,7 +351,7 @@ export default function BudgetScreen() {
                     styles.calendarDayCellInner,
                     isTodayDate && styles.calendarDayToday,
                     isSelectedDate && styles.calendarDaySelected,
-                    hasActivity && styles.calendarDayActive,
+                    hasActivity && !isTodayDate && !isSelectedDate && styles.calendarDayActive,
                   ]}
                   onPress={() => {
                     const d = new Date(year, month, day);
@@ -390,7 +373,10 @@ export default function BudgetScreen() {
                     </View>
                   )}
                   {hasActivity && (
-                    <Text style={[styles.calendarDayAmount, { color: data.balance >= 0 ? EV.primary : EV.danger }]}>
+                    <Text style={[
+                      styles.calendarDayAmount,
+                      { color: data.balance < 0 ? EV.danger : isTodayDate ? EV.primary : EV.textMuted }
+                    ]}>
                       ₱{data.balance.toFixed(0)}
                     </Text>
                   )}
@@ -424,7 +410,7 @@ export default function BudgetScreen() {
               </View>
               <View style={[styles.dailyStatCard, { borderColor: EV.danger + '40' }]}>
                 <Ionicons name="arrow-up-circle" size={24} color={EV.danger} />
-                <Text style={styles.dailyStatLabel}>Today's Expenses</Text>
+                <Text style={styles.dailyStatLabel}>Today&apos;s Expenses</Text>
                 <Text style={[styles.dailyStatValue, { color: EV.danger }]}>₱{dailyData.totalExpenses.toFixed(2)}</Text>
               </View>
               <View style={[styles.dailyStatCard, { borderColor: dailyData.balance >= 0 ? EV.primary + '40' : EV.danger + '40' }]}>
@@ -485,7 +471,12 @@ export default function BudgetScreen() {
     );
   };
 
-  const renderSummary = () => (
+  const renderSummary = () => {
+    const maxYearlyExpense = yearlyData?.monthly?.length
+      ? Math.max(...yearlyData.monthly.map((m: any) => m.expenses || 0), 1)
+      : 1;
+
+    return (
     <ScrollView showsVerticalScrollIndicator={false}>
       {monthlyData && (
         <View style={styles.summaryCard}>
@@ -543,22 +534,27 @@ export default function BudgetScreen() {
             </View>
           </View>
 
-          <Text style={[styles.sectionTitle, { marginTop: 20 }]}>MONTHLY TRENDS</Text>
+          <Text style={[styles.sectionTitle, { marginTop: 20, marginBottom: 10}]}>MONTHLY EXPENSES</Text>
           {yearlyData.monthly.map((m: any) => (
             <View key={m.month} style={styles.trendRow}>
               <Text style={styles.trendMonth}>{new Date(yearlyData.year, m.month - 1).toLocaleDateString('en', { month: 'short' })}</Text>
-              <View style={styles.trendBars}>
-                <View style={[styles.trendBar, { width: `${(m.income / Math.max(...yearlyData.monthly.map((x: any) => x.income), 1)) * 100}%`, backgroundColor: EV.primary }]} />
-                <View style={[styles.trendBar, { width: `${(m.expenses / Math.max(...yearlyData.monthly.map((x: any) => x.expenses), 1)) * 100}%`, backgroundColor: EV.danger }]} />
+              <View style={styles.trendTrack}>
+                <View
+                  style={[
+                    styles.trendBar,
+                    { width: `${(m.expenses / maxYearlyExpense) * 100}%` },
+                  ]}
+                />
               </View>
-              <Text style={[styles.trendBalance, { color: m.balance >= 0 ? EV.primary : EV.danger }]}>₱{m.balance.toFixed(0)}</Text>
+              <Text style={styles.trendExpenseValue}>₱{m.expenses.toFixed(0)}</Text>
             </View>
           ))}
         </View>
       )}
       <View style={{ height: 24 }} />
     </ScrollView>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -651,11 +647,11 @@ const styles = StyleSheet.create({
   calendarDayEmpty: { width: `${100/7}%`, aspectRatio: 1, padding: 2 },
   calendarDayCell: { width: `${100/7}%`, aspectRatio: 1, padding: 2, alignItems: 'center', justifyContent: 'center' },
   calendarDayCellInner: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: EV.bgSurface, borderRadius: 10, borderWidth: 1, borderColor: EV.border },
-  calendarDayToday: { borderColor: EV.primary, borderWidth: 2 },
+  calendarDayToday: { backgroundColor: EV.primary, borderColor: EV.primary, borderWidth: 2 },
   calendarDaySelected: { backgroundColor: EV.primary + '20', borderColor: EV.primary, borderWidth: 2 },
-  calendarDayActive: { backgroundColor: EV.bgElevated },
+  calendarDayActive: { backgroundColor: EV.bgSurface, borderColor: EV.border },
   calendarDayText: { fontSize: 14, fontWeight: '700', color: EV.text, marginBottom: 2 },
-  calendarDayTextToday: { color: EV.primary },
+  calendarDayTextToday: { color: EV.bg },
   calendarDayTextSelected: { color: EV.primary },
   calendarDayAmount: { fontSize: 9, fontWeight: '700', color: EV.textDim, marginTop: 2 },
   calendarDots: { flexDirection: 'row', gap: 3, marginTop: 2 },
@@ -668,7 +664,7 @@ const styles = StyleSheet.create({
   dailyStats: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   dailyStatCard: { flex: 1, backgroundColor: EV.bgSurface, borderRadius: 14, padding: 12, alignItems: 'center', gap: 6, borderWidth: 1 },
   dailyStatLabel: { fontSize: 10, color: EV.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  dailyStatValue: { fontSize: 15, fontWeight: '900' },
+  dailyStatValue: { fontSize: 13, fontWeight: '900' },
   emptyDaily: { alignItems: 'center', paddingVertical: 32, gap: 12 },
   emptyDailyText: { fontSize: 14, color: EV.textDim, fontWeight: '600' },
   summaryCard: { backgroundColor: EV.bgCard, borderRadius: 16, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: EV.border },
@@ -679,9 +675,9 @@ const styles = StyleSheet.create({
   summaryLabel: { fontSize: 11, color: EV.textMuted, fontWeight: '600', marginBottom: 6 },
   summaryValue: { fontSize: 17, fontWeight: '900', marginBottom: 4 },
   summaryChange: { fontSize: 11, fontWeight: '700' },
-  trendRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  trendRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   trendMonth: { width: 40, fontSize: 12, fontWeight: '700', color: EV.textMuted },
-  trendBars: { flex: 1, gap: 4 },
-  trendBar: { height: 6, borderRadius: 3 },
-  trendBalance: { width: 60, fontSize: 12, fontWeight: '700', textAlign: 'right' },
+  trendTrack: { flex: 1, height: 12, borderRadius: 999, backgroundColor: EV.bgSurface, overflow: 'hidden', borderWidth: 1, borderColor: EV.border },
+  trendBar: { height: '100%', borderRadius: 999, backgroundColor: EV.danger },
+  trendExpenseValue: { width: 68, fontSize: 12, fontWeight: '800', textAlign: 'right', color: EV.text },
 });
